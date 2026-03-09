@@ -15,7 +15,7 @@ export function generateConsultationId() {
   const chars = "0123456789";
   let result = "AL";
   for (let i = 0; i < 5; i++) {
-    result += chars.charAt(Math.floor(chars.random() * chars.length));
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
   }
   return result;
 }
