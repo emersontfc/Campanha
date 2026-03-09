@@ -74,7 +74,7 @@ export default function AdminDashboard() {
     if (consultations) {
       const total = consultations.length;
       const hypertension = consultations.filter(c => c.systolic >= 140 || c.diastolic >= 90).length;
-      const diabetes = consultations.filter(c => c.glucose >= 126).length;
+      const diabetes = consultations.filter(c => c.glucose >= 7.0).length;
       
       const bmiDist = {
         underweight: consultations.filter(c => c.bmi < 18.5).length,
@@ -381,6 +381,7 @@ export default function AdminDashboard() {
                       <thead>
                         <tr className="bg-slate-50/50">
                           <th className="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">ID Triagem</th>
+                          <th className="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Paciente</th>
                           <th className="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Profissional</th>
                           <th className="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">TA / Glicemia</th>
                           <th className="px-8 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Data</th>
@@ -391,6 +392,10 @@ export default function AdminDashboard() {
                           <tr key={c.id} className="hover:bg-slate-50/30 transition-colors">
                             <td className="px-8 py-5 font-mono text-xs font-bold text-cyan-600">{c.consultation_id}</td>
                             <td className="px-8 py-5">
+                              <p className="text-sm font-bold text-slate-900">{c.patient_name}</p>
+                              <p className="text-[10px] text-slate-400">{c.patient_age} anos</p>
+                            </td>
+                            <td className="px-8 py-5">
                               <p className="text-sm font-bold text-slate-900">{c.professional_name}</p>
                               <p className="text-[10px] text-slate-400">ID: {c.professional_id.slice(0,8)}</p>
                             </td>
@@ -399,8 +404,8 @@ export default function AdminDashboard() {
                                 <span className={`text-xs font-bold px-2 py-1 rounded-lg ${c.systolic >= 140 ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'}`}>
                                   {c.blood_pressure}
                                 </span>
-                                <span className={`text-xs font-bold px-2 py-1 rounded-lg ${c.glucose >= 126 ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600'}`}>
-                                  {c.glucose} mg/dL
+                                <span className={`text-xs font-bold px-2 py-1 rounded-lg ${c.glucose >= 7.0 ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                                  {c.glucose} mmol/L
                                 </span>
                               </div>
                             </td>

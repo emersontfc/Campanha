@@ -8,7 +8,8 @@ export function cn(...inputs: ClassValue[]) {
 export function calculateBMI(weight: number, heightCm: number) {
   if (!weight || !heightCm) return 0;
   const heightM = heightCm / 100;
-  return weight / (heightM * heightM);
+  const bmi = weight / (heightM * heightM);
+  return Number(bmi.toFixed(1));
 }
 
 export function generateConsultationId() {

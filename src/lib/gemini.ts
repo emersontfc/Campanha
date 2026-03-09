@@ -31,7 +31,8 @@ IMPORTANTE: Não use termos técnicos complexos. Seja motivador, não alarmista.
   const prompt = `DADOS CLÍNICOS PARA ANÁLISE:
 - IMC: ${data.bmi.toFixed(2)} (Peso: ${data.weight}kg, Altura: ${data.height}cm)
 - Tensão Arterial: ${data.systolic}/${data.diastolic} mmHg
-- Glicemia: ${data.glucose} mg/dL
+- Glicemia: ${data.glucose} mmol/L (Millimol por litro)
+- Nota: Considere 4.0 a 7.0 mmol/L como normal em jejum.
 
 Por favor, gere o relatório de saúde para o paciente.`;
 

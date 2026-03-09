@@ -3,6 +3,7 @@ import { AuthProvider } from "./hooks/useAuth";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { isSupabaseConfigured } from "./lib/supabase";
 import LoginPage from "./pages/LoginPage";
+import LandingPage from "./pages/LandingPage";
 import Dashboard from "./pages/Dashboard";
 import NewConsultation from "./pages/NewConsultation";
 import PatientPortal from "./pages/PatientPortal";
@@ -79,7 +80,7 @@ export default function App() {
               </ProtectedRoute>
             } 
           />
-          <Route path="/" element={<Navigate to="/dashboard" />} />
+          <Route path="/" element={<LandingPage />} />
         </Routes>
       </Router>
     </AuthProvider>

@@ -26,6 +26,8 @@ export interface Consultation {
   professional_id: string;
   campaign_id: string;
   professional_name: string;
+  patient_name: string;
+  patient_age: number;
   patient_phone: string;
   weight: number;
   height: number;

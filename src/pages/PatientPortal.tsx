@@ -86,24 +86,29 @@ export default function PatientPortal() {
               <h2 className="text-3xl font-black text-slate-900">{consultation.consultation_id}</h2>
             </div>
             <div className="text-right">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Data</p>
-              <p className="font-bold text-slate-700">{new Date(consultation.created_at).toLocaleDateString()}</p>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Data e Hora</p>
+              <p className="font-bold text-slate-700">
+                {new Date(consultation.created_at).toLocaleDateString()} {new Date(consultation.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </p>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-6 pt-6 border-t border-slate-50">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-6 border-t border-slate-50">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 bg-slate-50 rounded-full flex items-center justify-center text-slate-400">
-                <Phone className="w-4 h-4" />
+                <User className="w-4 h-4" />
               </div>
               <div>
                 <p className="text-[10px] text-slate-400 uppercase font-bold">Paciente</p>
-                <p className="text-sm font-bold text-slate-700">{consultation.patient_phone}</p>
+                <p className="text-sm font-bold text-slate-700">
+                  {consultation.patient_name} ({consultation.patient_age} anos)
+                </p>
+                <p className="text-[10px] text-slate-500">{consultation.patient_phone}</p>
               </div>
             </div>
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 bg-slate-50 rounded-full flex items-center justify-center text-slate-400">
-                <User className="w-4 h-4" />
+                <Heart className="w-4 h-4" />
               </div>
               <div>
                 <p className="text-[10px] text-slate-400 uppercase font-bold">Profissional</p>
@@ -129,7 +134,7 @@ export default function PatientPortal() {
           </div>
           <div className="bg-white p-4 rounded-2xl border border-slate-100 text-center">
             <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Glicemia</p>
-            <p className="text-xl font-black text-slate-900">{consultation.glucose}<span className="text-xs font-normal ml-1">mg/dL</span></p>
+            <p className="text-xl font-black text-slate-900">{consultation.glucose}<span className="text-xs font-normal ml-1">mmol/L</span></p>
           </div>
         </div>
 

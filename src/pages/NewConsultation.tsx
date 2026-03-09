@@ -16,6 +16,8 @@ export default function NewConsultation() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   
   const [formData, setFormData] = useState({
+    patientName: "",
+    patientAge: "",
     patientPhone: "",
     weight: "",
     height: "",
@@ -83,10 +85,12 @@ export default function NewConsultation() {
             professional_id: user.id,
             campaign_id: formData.campaignId,
             professional_name: profile?.name,
+            patient_name: formData.patientName,
+            patient_age: Number(formData.patientAge),
             patient_phone: formatMozPhone(formData.patientPhone),
             weight: Number(formData.weight),
             height: Number(formData.height),
-            bmi,
+            bmi: Number(bmi.toFixed(1)),
             blood_pressure: `${formData.systolic}/${formData.diastolic}`,
             systolic: Number(formData.systolic),
             diastolic: Number(formData.diastolic),
@@ -141,15 +145,40 @@ export default function NewConsultation() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Telemóvel do Paciente (+258)</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Nome do Paciente</label>
               <input
-                type="tel"
-                placeholder="840000000"
+                type="text"
+                placeholder="Nome Completo"
                 required
                 className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-cyan-500 outline-none"
-                value={formData.patientPhone}
-                onChange={(e) => setFormData({ ...formData, patientPhone: e.target.value })}
+                value={formData.patientName}
+                onChange={(e) => setFormData({ ...formData, patientName: e.target.value })}
               />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Idade</label>
+                <input
+                  type="number"
+                  placeholder="Ex: 45"
+                  required
+                  className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-cyan-500 outline-none"
+                  value={formData.patientAge}
+                  onChange={(e) => setFormData({ ...formData, patientAge: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Telemóvel (+258)</label>
+                <input
+                  type="tel"
+                  placeholder="840000000"
+                  required
+                  className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-cyan-500 outline-none"
+                  value={formData.patientPhone}
+                  onChange={(e) => setFormData({ ...formData, patientPhone: e.target.value })}
+                />
+              </div>
             </div>
           </div>
 
@@ -211,10 +240,12 @@ export default function NewConsultation() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Glicemia (mg/dL)</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Glicemia (mmol/L)</label>
               <input
                 type="number"
+                step="0.1"
                 required
+                placeholder="Ex: 5.5"
                 className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-cyan-500 outline-none"
                 value={formData.glucose}
                 onChange={(e) => setFormData({ ...formData, glucose: e.target.value })}
