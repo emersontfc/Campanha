@@ -100,30 +100,48 @@ export default function PatientPortal() {
     try {
       // Create consultation request in general pool
       const consultationId = generateConsultationId();
+      
+      // Get an active campaign if any exists to avoid NOT NULL constraints
+      const { data: activeCampaigns } = await supabase
+        .from('campaigns')
+        .select('id')
+        .eq('active', true)
+        .limit(1);
+
+      const insertData: any = {
+        consultation_id: consultationId,
+        patient_name: formData.name,
+        patient_age: Number(formData.age),
+        patient_phone: formatMozPhone(formData.phone),
+        weight: 0,
+        height: 0,
+        bmi: 0,
+        blood_pressure: "0/0",
+        systolic: 0,
+        diastolic: 0,
+        glucose: 0,
+        patient_sex: 'M', // Default
+        is_smoker: false,
+        is_on_hypertension_treatment: false,
+        cvd_risk_score: 0,
+        ai_analysis: `SOLICITAÇÃO DE CONSULTA\n\nMotivo: ${formData.reason}`,
+        status: 'pending'
+      };
+
+      if (activeCampaigns && activeCampaigns.length > 0) {
+        insertData.campaign_id = activeCampaigns[0].id;
+      }
+
       const { error: consError } = await supabase
         .from('consultations')
-        .insert([{
-          consultation_id: consultationId,
-          patient_name: formData.name,
-          patient_age: Number(formData.age),
-          patient_phone: formatMozPhone(formData.phone),
-          weight: 0,
-          height: 0,
-          bmi: 0,
-          blood_pressure: "0/0",
-          systolic: 0,
-          diastolic: 0,
-          glucose: 0,
-          ai_analysis: `SOLICITAÇÃO DE CONSULTA\n\nMotivo: ${formData.reason}`,
-          status: 'pending'
-        }]);
+        .insert([insertData]);
         
       if (consError) throw consError;
       
       navigate(`/patient?id=${consultationId}`);
-    } catch (err) {
-      console.error(err);
-      alert("Erro ao solicitar consulta.");
+    } catch (err: any) {
+      console.error("Request Error:", err);
+      alert(`Erro ao solicitar consulta: ${err.message || "Erro de conexão"}`);
     } finally {
       setRequesting(false);
     }
