@@ -304,13 +304,32 @@ export default function PatientPortal() {
         </div>
         <h1 className="text-2xl font-black text-slate-900 mb-2">Pedido Aceite!</h1>
         <p className="text-slate-500 mb-8 max-w-sm">
-          O médico <strong>{consultation.professional_name}</strong> aceitou o seu pedido.
+          O médico <strong>{consultation.professional_name}</strong> aceitou o seu pedido e aguarda por si.
         </p>
         
-        <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm w-full max-w-sm">
+        <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm w-full max-w-sm mb-6">
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Dirija-se ao Gabinete</p>
           <p className="text-6xl font-black text-cyan-600">{consultation.room_number}</p>
         </div>
+
+        <div className="flex items-center gap-3 text-amber-600 bg-amber-50 px-6 py-4 rounded-2xl border border-amber-100 animate-pulse">
+          <Loader2 className="w-5 h-5 animate-spin" />
+          <span className="text-sm font-bold uppercase tracking-tight">Aguardando o Prontuário...</span>
+        </div>
+        <p className="text-[10px] text-slate-400 mt-4 max-w-[200px] mb-6">
+          O seu relatório de saúde aparecerá aqui automaticamente assim que o médico concluir o atendimento.
+        </p>
+
+        <button 
+          onClick={() => {
+            navigator.clipboard.writeText(window.location.href);
+            alert("Link do prontuário copiado! Guarde este link para aceder ao seu relatório mais tarde.");
+          }}
+          className="flex items-center gap-2 px-6 py-3 bg-white border border-slate-200 text-slate-600 rounded-2xl font-bold text-xs hover:bg-slate-50 transition-all active:scale-[0.98] shadow-sm"
+        >
+          <Share2 className="w-4 h-4" />
+          GUARDAR LINK DO PRONTUÁRIO
+        </button>
       </div>
     );
   }
@@ -338,6 +357,26 @@ export default function PatientPortal() {
       </header>
 
       <main className="max-w-2xl mx-auto p-4 space-y-6 print:p-0 print:space-y-8">
+        <div className="flex flex-col sm:flex-row gap-3 print:hidden">
+          <button 
+            onClick={() => {
+              navigator.clipboard.writeText(window.location.href);
+              alert("Link do prontuário copiado!");
+            }}
+            className="flex-1 flex items-center justify-center gap-2 px-6 py-4 bg-cyan-600 text-white rounded-2xl font-black text-sm hover:bg-cyan-700 transition-all shadow-lg shadow-cyan-200 active:scale-[0.98]"
+          >
+            <Share2 className="w-5 h-5" />
+            COPIAR LINK DO PRONTUÁRIO
+          </button>
+          <button 
+            onClick={() => window.print()}
+            className="px-6 py-4 bg-white border border-slate-200 text-slate-600 rounded-2xl font-bold text-sm hover:bg-slate-50 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+          >
+            <Printer className="w-5 h-5" />
+            IMPRIMIR
+          </button>
+        </div>
+
         {/* ID Card */}
         <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm print:shadow-none print:border-slate-300">
           <div className="flex justify-between items-start mb-6">
