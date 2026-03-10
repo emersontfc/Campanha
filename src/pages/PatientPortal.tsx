@@ -43,12 +43,18 @@ export default function PatientPortal() {
     };
 
     fetchData();
+    
+    const interval = setInterval(() => {
+      fetchData();
+    }, 5000);
+    
+    return () => clearInterval(interval);
   }, [id]);
 
   const handleShare = () => {
     if (!id) return;
     
-    const reportUrl = `${window.location.origin}/patient?id=${id}`;
+    const reportUrl = `${window.location.origin}/#/patient?id=${id}`;
     const text = `*Relatório de Saúde Al-Shifa*\n\nOlá! Aqui está o seu relatório de saúde (ID: ${id}).\n\nVeja os detalhes completos aqui:\n${reportUrl}`;
     
     const phone = consultation?.patient_phone?.replace(/\D/g, "") || "";
@@ -61,33 +67,12 @@ export default function PatientPortal() {
     setRequesting(true);
     
     try {
-      // 1. Get online doctors
-      const { data: doctors, error: docError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('role', 'professional')
-        .eq('is_online', true)
-        .eq('is_verified', true);
-        
-      if (docError) throw docError;
-      
-      if (!doctors || doctors.length === 0) {
-        alert("Desculpe, não há médicos online no momento. Por favor, tente mais tarde.");
-        setRequesting(false);
-        return;
-      }
-      
-      // 2. Pick random doctor
-      const randomDoctor = doctors[Math.floor(Math.random() * doctors.length)];
-      
-      // 3. Create consultation request
+      // Create consultation request in general pool
       const consultationId = generateConsultationId();
       const { error: consError } = await supabase
         .from('consultations')
         .insert([{
           consultation_id: consultationId,
-          professional_id: randomDoctor.id,
-          professional_name: randomDoctor.name,
           patient_name: formData.name,
           patient_age: Number(formData.age),
           patient_phone: formatMozPhone(formData.phone),
@@ -98,8 +83,8 @@ export default function PatientPortal() {
           systolic: 0,
           diastolic: 0,
           glucose: 0,
-          ai_analysis: `SOLICITAÇÃO DE CONSULTA\n\nMotivo: ${formData.reason}\n\nStatus: Aguardando triagem biométrica pelo profissional.`,
-          campaign_id: null // Or fetch a default campaign
+          ai_analysis: `SOLICITAÇÃO DE CONSULTA\n\nMotivo: ${formData.reason}`,
+          status: 'pending'
         }]);
         
       if (consError) throw consError;
@@ -220,6 +205,39 @@ export default function PatientPortal() {
         <h1 className="text-xl font-bold text-slate-900">Relatório não encontrado</h1>
         <p className="text-slate-500 mb-6">O ID fornecido é inválido ou a consulta foi removida.</p>
         <Link to="/" className="text-cyan-600 font-bold">Voltar ao Início</Link>
+      </div>
+    );
+  }
+
+  if (consultation.status === 'pending') {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4 text-center">
+        <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mb-6">
+          <Loader2 className="w-8 h-8 text-amber-600 animate-spin" />
+        </div>
+        <h1 className="text-2xl font-black text-slate-900 mb-2">Aguarde, procurando um médico...</h1>
+        <p className="text-slate-500 max-w-sm">
+          A sua solicitação foi enviada. Por favor, aguarde enquanto um médico disponível aceita o seu pedido.
+        </p>
+      </div>
+    );
+  }
+
+  if (consultation.status === 'accepted') {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4 text-center">
+        <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mb-6">
+          <ShieldCheck className="w-10 h-10 text-emerald-600" />
+        </div>
+        <h1 className="text-2xl font-black text-slate-900 mb-2">Pedido Aceite!</h1>
+        <p className="text-slate-500 mb-8 max-w-sm">
+          O médico <strong>{consultation.professional_name}</strong> aceitou o seu pedido.
+        </p>
+        
+        <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm w-full max-w-sm">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Dirija-se ao Gabinete</p>
+          <p className="text-6xl font-black text-cyan-600">{consultation.room_number}</p>
+        </div>
       </div>
     );
   }

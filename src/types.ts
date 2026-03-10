@@ -24,9 +24,9 @@ export interface Campaign {
 export interface Consultation {
   id: string;
   consultation_id: string;
-  professional_id: string;
+  professional_id?: string;
   campaign_id: string;
-  professional_name: string;
+  professional_name?: string;
   patient_name: string;
   patient_age: number;
   patient_phone: string;
@@ -38,6 +38,8 @@ export interface Consultation {
   diastolic: number;
   glucose: number;
   ai_analysis: string;
+  status?: 'pending' | 'accepted' | 'completed';
+  room_number?: string;
   created_at: string;
 }
 

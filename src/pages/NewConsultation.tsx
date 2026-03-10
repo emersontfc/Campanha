@@ -102,6 +102,7 @@ export default function NewConsultation() {
             diastolic: Number(formData.diastolic),
             glucose: Number(formData.glucose),
             ai_analysis: aiAnalysis,
+            status: 'completed',
           }
         ]);
         

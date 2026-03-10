@@ -10,6 +10,7 @@ export default function Dashboard() {
   const [stats, setStats] = useState({ total: 0, today: 0 });
   const [recentConsultations, setRecentConsultations] = useState<any[]>([]);
   const [pendingRequests, setPendingRequests] = useState<any[]>([]);
+  const [acceptedRequests, setAcceptedRequests] = useState<any[]>([]);
   const [isOnline, setIsOnline] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const navigate = useNavigate();
@@ -48,33 +49,78 @@ export default function Dashboard() {
           .from('consultations')
           .select('*', { count: 'exact' })
           .eq('professional_id', user.id)
-          .gt('weight', 0) // Only those with data
+          .eq('status', 'completed')
           .order('created_at', { ascending: false })
           .limit(5);
         
         setRecentConsultations(recent || []);
         setStats({ total: count || 0, today: 0 });
 
-        // Fetch pending requests assigned to this doctor
+        // Fetch pending requests (unassigned)
         const { data: pending } = await supabase
           .from('consultations')
           .select('*')
-          .eq('professional_id', user.id)
-          .eq('weight', 0) // Requests have 0 weight initially
+          .eq('status', 'pending')
           .order('created_at', { ascending: false });
         
         setPendingRequests(pending || []);
+
+        // Fetch accepted requests assigned to this doctor
+        const { data: accepted } = await supabase
+          .from('consultations')
+          .select('*')
+          .eq('professional_id', user.id)
+          .eq('status', 'accepted')
+          .order('created_at', { ascending: false });
+        
+        setAcceptedRequests(accepted || []);
       } catch (error) {
         console.error("Error fetching consultations:", error);
       }
     };
 
     fetchData();
+    
+    const interval = setInterval(() => {
+      fetchData();
+    }, 5000);
+    
+    return () => clearInterval(interval);
   }, [user]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate("/login");
+  };
+
+  const handleAcceptRequest = async (consultationId: string) => {
+    const roomNumber = window.prompt("Digite o número do gabinete para esta consulta:");
+    if (!roomNumber) return;
+    
+    try {
+      const { error } = await supabase
+        .from('consultations')
+        .update({
+          status: 'accepted',
+          room_number: roomNumber,
+          professional_id: user?.id,
+          professional_name: profile?.name
+        })
+        .eq('consultation_id', consultationId);
+        
+      if (error) throw error;
+      
+      // Refresh data
+      const acceptedReq = pendingRequests.find(r => r.consultation_id === consultationId);
+      if (acceptedReq) {
+        setPendingRequests(prev => prev.filter(r => r.consultation_id !== consultationId));
+        setAcceptedRequests(prev => [{...acceptedReq, status: 'accepted', room_number: roomNumber}, ...prev]);
+      }
+      
+    } catch (error) {
+      console.error("Error accepting request:", error);
+      alert("Erro ao aceitar solicitação.");
+    }
   };
 
   return (
@@ -185,10 +231,9 @@ export default function Dashboard() {
               </div>
             ) : (
               pendingRequests.map((r) => (
-                <Link
+                <div
                   key={r.id}
-                  to={`/edit-consultation?id=${r.consultation_id}`}
-                  className="block bg-white p-4 rounded-2xl border-2 border-amber-100 shadow-sm active:bg-amber-50 transition-colors relative overflow-hidden"
+                  className="block bg-white p-4 rounded-2xl border-2 border-amber-100 shadow-sm relative overflow-hidden"
                 >
                   <div className="absolute top-0 right-0 w-1 h-full bg-amber-400" />
                   <div className="flex justify-between items-start mb-2">
@@ -197,17 +242,51 @@ export default function Dashboard() {
                       {new Date(r.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
-                  <p className="text-xs text-slate-500 line-clamp-1">{r.ai_analysis.split('\n\n')[1]?.replace('Motivo: ', '')}</p>
-                </Link>
+                  <p className="text-xs text-slate-500 line-clamp-1 mb-3">{r.ai_analysis.replace('SOLICITAÇÃO DE CONSULTA\n\nMotivo: ', '')}</p>
+                  <button
+                    onClick={() => handleAcceptRequest(r.consultation_id)}
+                    className="w-full bg-amber-100 text-amber-700 font-bold py-2 rounded-xl text-sm active:bg-amber-200 transition-colors"
+                  >
+                    Aceitar e Informar Gabinete
+                  </button>
+                </div>
               ))
             )}
           </div>
         </div>
 
+        {acceptedRequests.length > 0 && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between px-1">
+              <h2 className="font-bold text-slate-900">Em Andamento (Aceites)</h2>
+              <span className="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded-full uppercase">
+                {acceptedRequests.length}
+              </span>
+            </div>
+            <div className="space-y-3">
+              {acceptedRequests.map((r) => (
+                <Link
+                  key={r.id}
+                  to={`/edit-consultation?id=${r.consultation_id}`}
+                  className="block bg-white p-4 rounded-2xl border-2 border-emerald-100 shadow-sm active:bg-emerald-50 transition-colors relative overflow-hidden"
+                >
+                  <div className="absolute top-0 right-0 w-1 h-full bg-emerald-400" />
+                  <div className="flex justify-between items-start mb-2">
+                    <span className="font-bold text-slate-900">{r.patient_name}</span>
+                    <span className="text-[10px] font-bold text-slate-400">
+                      Gabinete: {r.room_number}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 line-clamp-1">Clique para preencher a triagem</p>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="space-y-3">
           <div className="flex items-center justify-between px-1">
             <h2 className="font-bold text-slate-900">Consultas Recentes</h2>
-            <Link to="/consultations" className="text-cyan-600 text-sm font-medium">Ver todas</Link>
           </div>
           <div className="space-y-3">
             {recentConsultations.length === 0 ? (

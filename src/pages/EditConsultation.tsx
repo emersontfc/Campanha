@@ -120,6 +120,7 @@ export default function EditConsultation() {
           diastolic: Number(formData.diastolic),
           glucose: Number(formData.glucose),
           ai_analysis: aiAnalysis,
+          status: 'completed',
         })
         .eq('consultation_id', id);
         
