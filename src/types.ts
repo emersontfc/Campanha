@@ -7,6 +7,7 @@ export interface Profile {
   role: UserRole;
   specialty: string;
   is_verified: boolean;
+  is_online: boolean;
   created_at: string;
 }
 

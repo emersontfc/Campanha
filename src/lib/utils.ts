@@ -22,7 +22,17 @@ export function generateConsultationId() {
 }
 
 export function formatMozPhone(value: string) {
-  const cleaned = value.replace(/\D/g, "");
+  let cleaned = value.replace(/\D/g, "");
+  
+  // Se começar com 00258, remover os 00
+  if (cleaned.startsWith("00258")) {
+    cleaned = cleaned.substring(2);
+  }
+  // Se começar com 0, remover o 0 (ex: 084 -> 84)
+  else if (cleaned.startsWith("0") && !cleaned.startsWith("00")) {
+    cleaned = cleaned.substring(1);
+  }
+
   if (cleaned.startsWith("258")) {
     return "+" + cleaned;
   }

@@ -46,8 +46,13 @@ export default function PatientPortal() {
   }, [id]);
 
   const handleShare = () => {
-    const text = `Olá! Aqui está o seu relatório de saúde Al-Shifa (ID: ${id}). Veja os detalhes em: ${window.location.href}`;
-    const url = `https://wa.me/${consultation?.patient_phone?.replace(/\D/g, "")}?text=${encodeURIComponent(text)}`;
+    if (!id) return;
+    
+    const reportUrl = `${window.location.origin}/patient?id=${id}`;
+    const text = `*Relatório de Saúde Al-Shifa*\n\nOlá! Aqui está o seu relatório de saúde (ID: ${id}).\n\nVeja os detalhes completos aqui:\n${reportUrl}`;
+    
+    const phone = consultation?.patient_phone?.replace(/\D/g, "") || "";
+    const url = `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
     window.open(url, "_blank");
   };
 
@@ -319,9 +324,17 @@ export default function PatientPortal() {
             <Sparkles className="w-5 h-5 text-cyan-600" />
             Análise e Recomendações
           </h3>
-          <div className="prose prose-slate text-slate-600 leading-relaxed whitespace-pre-wrap">
+          <div className="prose prose-slate text-slate-600 leading-relaxed whitespace-pre-wrap mb-8">
             {consultation.ai_analysis}
           </div>
+
+          <button
+            onClick={handleShare}
+            className="w-full bg-emerald-600 text-white font-bold py-4 rounded-2xl shadow-lg flex items-center justify-center gap-2 active:scale-[0.98] transition-all"
+          >
+            <Send className="w-5 h-5" />
+            Enviar Relatório via WhatsApp
+          </button>
         </div>
 
         {/* Footer */}
