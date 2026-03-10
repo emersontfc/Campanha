@@ -7,6 +7,7 @@ export async function analyzeConsultation(data: {
   systolic: number;
   diastolic: number;
   glucose: number;
+  physicalExamination?: string;
 }) {
   const model = "gemini-3-flash-preview";
   
@@ -39,6 +40,7 @@ IMPORTANTE: Não use termos técnicos complexos. Seja motivador, não alarmista.
 - Tensão Arterial: ${data.systolic}/${data.diastolic} mmHg
 - Glicemia: ${data.glucose} mmol/L (Millimol por litro)
 - Nota: Considere 4.0 a 7.0 mmol/L como normal em jejum.
+${data.physicalExamination ? `- Exame Físico: ${data.physicalExamination}` : ''}
 
 Por favor, gere o relatório de saúde para o paciente.`;
 

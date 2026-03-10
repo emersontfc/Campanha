@@ -37,6 +37,7 @@ export interface Consultation {
   systolic: number;
   diastolic: number;
   glucose: number;
+  physical_examination?: string;
   ai_analysis: string;
   status?: 'pending' | 'accepted' | 'completed';
   room_number?: string;

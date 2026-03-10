@@ -24,6 +24,7 @@ export default function NewConsultation() {
     systolic: "",
     diastolic: "",
     glucose: "",
+    physicalExamination: "",
     campaignId: "",
   });
 
@@ -56,6 +57,7 @@ export default function NewConsultation() {
         systolic: Number(formData.systolic),
         diastolic: Number(formData.diastolic),
         glucose: Number(formData.glucose),
+        physicalExamination: formData.physicalExamination,
       });
       
       if (analysis.startsWith("Erro:")) {
@@ -97,6 +99,7 @@ export default function NewConsultation() {
         systolic: Number(formData.systolic),
         diastolic: Number(formData.diastolic),
         glucose: Number(formData.glucose),
+        physical_examination: formData.physicalExamination,
         ai_analysis: aiAnalysis,
         status: 'completed',
       };
@@ -268,6 +271,19 @@ export default function NewConsultation() {
                 className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-cyan-500 outline-none"
                 value={formData.glucose}
                 onChange={(e) => setFormData({ ...formData, glucose: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4">
+            <h2 className="font-bold text-slate-900 mb-2">Exame Físico</h2>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Ausculta Pulmonar, Cardíaca, Membros Inferiores, etc.</label>
+              <textarea
+                className="w-full h-32 px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-cyan-500 outline-none text-sm text-slate-600"
+                placeholder="Descreva os achados do exame físico..."
+                value={formData.physicalExamination}
+                onChange={(e) => setFormData({ ...formData, physicalExamination: e.target.value })}
               />
             </div>
           </div>

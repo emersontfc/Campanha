@@ -348,6 +348,18 @@ export default function PatientPortal() {
           <p className="text-2xl font-black text-slate-900">{consultation.blood_pressure}<span className="text-xs font-normal ml-1">mmHg</span></p>
         </div>
 
+        {consultation.physical_examination && (
+          <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm relative overflow-hidden">
+            <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+              <Activity className="w-5 h-5 text-cyan-600" />
+              Exame Físico
+            </h3>
+            <div className="prose prose-slate text-slate-600 leading-relaxed whitespace-pre-wrap">
+              {consultation.physical_examination}
+            </div>
+          </div>
+        )}
+
         {/* AI Analysis */}
         <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm relative overflow-hidden">
           <div className="absolute top-0 right-0 p-4 opacity-10">
