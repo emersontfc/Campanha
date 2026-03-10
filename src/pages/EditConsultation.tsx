@@ -4,8 +4,8 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../hooks/useAuth";
 import { analyzeConsultation } from "../lib/gemini";
-import { calculateBMI } from "../lib/utils";
-import { ChevronLeft, Sparkles, Save, Loader2, MapPin, User, History } from "lucide-react";
+import { calculateBMI, calculateFraminghamRisk } from "../lib/utils";
+import { ChevronLeft, Sparkles, Save, Loader2, MapPin, User, History, Activity } from "lucide-react";
 import { Campaign } from "../types";
 
 export default function EditConsultation() {
@@ -28,6 +28,10 @@ export default function EditConsultation() {
     systolic: "",
     diastolic: "",
     glucose: "",
+    patientSex: "M" as "M" | "F",
+    isSmoker: false,
+    isTreated: false,
+    hasDiabetes: false,
     physicalExamination: "",
     campaignId: "",
   });
@@ -35,6 +39,16 @@ export default function EditConsultation() {
   const [aiAnalysis, setAiAnalysis] = useState("");
   const [previousConsultations, setPreviousConsultations] = useState<any[]>([]);
   const bmi = calculateBMI(Number(formData.weight), Number(formData.height));
+  
+  const cvdRisk = calculateFraminghamRisk(
+    Number(formData.patientAge),
+    formData.patientSex,
+    bmi,
+    Number(formData.systolic),
+    formData.isTreated,
+    formData.isSmoker,
+    formData.hasDiabetes
+  );
 
   useEffect(() => {
     const fetchData = async () => {
@@ -56,6 +70,10 @@ export default function EditConsultation() {
           systolic: c.systolic > 0 ? String(c.systolic) : "",
           diastolic: c.diastolic > 0 ? String(c.diastolic) : "",
           glucose: c.glucose > 0 ? String(c.glucose) : "",
+          patientSex: c.patient_sex || "M",
+          isSmoker: c.is_smoker || false,
+          isTreated: c.is_on_hypertension_treatment || false,
+          hasDiabetes: c.glucose >= 7.0 || false, // Fallback if not explicitly set
           physicalExamination: c.physical_examination || "",
           campaignId: c.campaign_id || "",
         });
@@ -99,6 +117,10 @@ export default function EditConsultation() {
         systolic: Number(formData.systolic),
         diastolic: Number(formData.diastolic),
         glucose: Number(formData.glucose),
+        patientSex: formData.patientSex,
+        isSmoker: formData.isSmoker,
+        isTreated: formData.isTreated,
+        cvdRisk: cvdRisk,
         physicalExamination: formData.physicalExamination,
       });
       
@@ -135,6 +157,10 @@ export default function EditConsultation() {
         systolic: Number(formData.systolic),
         diastolic: Number(formData.diastolic),
         glucose: Number(formData.glucose),
+        patient_sex: formData.patientSex,
+        is_smoker: formData.isSmoker,
+        is_on_hypertension_treatment: formData.isTreated,
+        cvd_risk_score: cvdRisk,
         physical_examination: formData.physicalExamination,
         ai_analysis: aiAnalysis,
         status: 'completed',
@@ -243,16 +269,74 @@ export default function EditConsultation() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Telemóvel</label>
-                  <input
-                    type="text"
-                    disabled
-                    className="w-full px-4 py-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-500"
-                    value={formData.patientPhone}
-                  />
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Sexo</label>
+                  <select
+                    required
+                    className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-cyan-500 outline-none bg-white"
+                    value={formData.patientSex}
+                    onChange={(e) => setFormData({ ...formData, patientSex: e.target.value as "M" | "F" })}
+                  >
+                    <option value="M">Masculino</option>
+                    <option value="F">Feminino</option>
+                  </select>
                 </div>
               </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Telemóvel</label>
+                <input
+                  type="text"
+                  disabled
+                  className="w-full px-4 py-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-500"
+                  value={formData.patientPhone}
+                />
+              </div>
             </div>
+          </div>
+
+          <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4">
+            <h2 className="font-bold text-slate-900 mb-2">Fatores de Risco & Histórico</h2>
+            
+            <div className="grid grid-cols-1 gap-3">
+              <label className="flex items-center gap-3 p-3 rounded-xl border border-slate-100 hover:bg-slate-50 cursor-pointer transition-colors">
+                <input
+                  type="checkbox"
+                  className="w-5 h-5 rounded border-slate-300 text-cyan-600 focus:ring-cyan-500"
+                  checked={formData.isSmoker}
+                  onChange={(e) => setFormData({ ...formData, isSmoker: e.target.checked })}
+                />
+                <div className="flex-1">
+                  <span className="block text-sm font-bold text-slate-900">Fumador Ativo</span>
+                  <span className="block text-xs text-slate-500">Consumo de tabaco no último ano</span>
+                </div>
+              </label>
+
+              <label className="flex items-center gap-3 p-3 rounded-xl border border-slate-100 hover:bg-slate-50 cursor-pointer transition-colors">
+                <input
+                  type="checkbox"
+                  className="w-5 h-5 rounded border-slate-300 text-cyan-600 focus:ring-cyan-500"
+                  checked={formData.isTreated}
+                  onChange={(e) => setFormData({ ...formData, isTreated: e.target.checked })}
+                />
+                <div className="flex-1">
+                  <span className="block text-sm font-bold text-slate-900">Tratamento para Hipertensão</span>
+                  <span className="block text-xs text-slate-500">Toma medicação para a tensão arterial</span>
+                </div>
+              </label>
+
+              <label className="flex items-center gap-3 p-3 rounded-xl border border-slate-100 hover:bg-slate-50 cursor-pointer transition-colors">
+                <input
+                  type="checkbox"
+                  className="w-5 h-5 rounded border-slate-300 text-cyan-600 focus:ring-cyan-500"
+                  checked={formData.hasDiabetes}
+                  onChange={(e) => setFormData({ ...formData, hasDiabetes: e.target.checked })}
+                />
+                <div className="flex-1">
+                  <span className="block text-sm font-bold text-slate-900">Diabetes Mellitus</span>
+                  <span className="block text-xs text-slate-500">Diagnóstico prévio de diabetes</span>
+                </div>
+              </label>
+            </div>
+          </div>
 
             <div className="pt-4 border-t border-slate-50">
               <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-2">
@@ -277,10 +361,19 @@ export default function EditConsultation() {
                 </select>
               )}
             </div>
-          </div>
 
           <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4">
-            <h2 className="font-bold text-slate-900 mb-2">Dados Biométricos</h2>
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="font-bold text-slate-900">Dados Biométricos</h2>
+              <div className={`px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 ${
+                cvdRisk < 10 ? 'bg-emerald-50 text-emerald-700' :
+                cvdRisk < 20 ? 'bg-amber-50 text-amber-700' :
+                'bg-rose-50 text-rose-700'
+              }`}>
+                <Activity className="w-3 h-3" />
+                Risco CVD: {cvdRisk}%
+              </div>
+            </div>
             
             <div className="grid grid-cols-2 gap-4">
               <div>

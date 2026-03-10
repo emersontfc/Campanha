@@ -138,12 +138,13 @@ export default function Dashboard() {
       const { error } = await supabase
         .from('consultations')
         .delete()
-        .eq('id', id);
+        .or(`id.eq.${id},consultation_id.eq.${id}`);
         
       if (error) throw error;
       
-      setRecentConsultations(prev => prev.filter(c => c.id !== id));
-      setStats(prev => ({ ...prev, total: prev.total - 1 }));
+      setRecentConsultations(prev => prev.filter(c => c.id !== id && c.consultation_id !== id));
+      setStats(prev => ({ ...prev, total: Math.max(0, prev.total - 1) }));
+      alert("Consulta eliminada com sucesso.");
     } catch (error) {
       console.error("Error deleting consultation:", error);
       alert("Erro ao eliminar a consulta.");

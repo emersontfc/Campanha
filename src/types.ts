@@ -37,6 +37,10 @@ export interface Consultation {
   systolic: number;
   diastolic: number;
   glucose: number;
+  patient_sex?: 'M' | 'F';
+  is_smoker?: boolean;
+  is_on_hypertension_treatment?: boolean;
+  cvd_risk_score?: number;
   physical_examination?: string;
   ai_analysis: string;
   status?: 'pending' | 'accepted' | 'completed';

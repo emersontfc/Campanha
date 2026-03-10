@@ -7,6 +7,10 @@ export async function analyzeConsultation(data: {
   systolic: number;
   diastolic: number;
   glucose: number;
+  patientSex?: 'M' | 'F';
+  isSmoker?: boolean;
+  isTreated?: boolean;
+  cvdRisk?: number;
   physicalExamination?: string;
 }) {
   const model = "gemini-3-flash-preview";
@@ -39,6 +43,10 @@ IMPORTANTE: Não use termos técnicos complexos. Seja motivador, não alarmista.
 - IMC: ${data.bmi.toFixed(2)} (Peso: ${data.weight}kg, Altura: ${data.height}cm)
 - Tensão Arterial: ${data.systolic}/${data.diastolic} mmHg
 - Glicemia: ${data.glucose} mmol/L (Millimol por litro)
+- Sexo: ${data.patientSex === 'M' ? 'Masculino' : 'Feminino'}
+- Fumador: ${data.isSmoker ? 'Sim' : 'Não'}
+- Em tratamento para Hipertensão: ${data.isTreated ? 'Sim' : 'Não'}
+- Risco Cardiovascular (Framingham): ${data.cvdRisk}% (Risco de evento em 10 anos)
 - Nota: Considere 4.0 a 7.0 mmol/L como normal em jejum.
 ${data.physicalExamination ? `- Exame Físico: ${data.physicalExamination}` : ''}
 

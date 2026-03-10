@@ -290,15 +290,57 @@ export default function AdminDashboard() {
       const { error } = await supabase
         .from('consultations')
         .delete()
-        .eq('id', id);
+        .or(`id.eq.${id},consultation_id.eq.${id}`);
         
       if (error) throw error;
-      setConsultations(consultations.filter(c => c.id !== id));
+      setConsultations(consultations.filter(c => c.id !== id && c.consultation_id !== id));
       fetchData(); // Refresh stats
+      alert("Consulta eliminada com sucesso.");
     } catch (err) {
       console.error("Error deleting consultation:", err);
       alert("Erro ao eliminar a consulta.");
     }
+  };
+
+  const exportToCSV = () => {
+    if (consultations.length === 0) return;
+    
+    const headers = [
+      "ID Consulta", "Data", "Paciente", "Idade", "Sexo", "Telemovel", 
+      "Peso", "Altura", "IMC", "TA Sistolica", "TA Diastolica", "Glicemia",
+      "Fumador", "Tratamento HT", "Risco CVD %", "Medico", "Campanha"
+    ];
+    
+    const csvRows = consultations.map(c => [
+      c.consultation_id,
+      new Date(c.created_at).toLocaleDateString(),
+      c.patient_name,
+      c.patient_age,
+      c.patient_sex || 'M',
+      c.patient_phone,
+      c.weight,
+      c.height,
+      c.bmi,
+      c.systolic,
+      c.diastolic,
+      c.glucose,
+      c.is_smoker ? 'Sim' : 'Não',
+      c.is_on_hypertension_treatment ? 'Sim' : 'Não',
+      c.cvd_risk_score || 0,
+      c.professional_name || '-',
+      c.campaigns?.name || '-'
+    ].map(val => `"${val}"`).join(","));
+    
+    const csvContent = [headers.join(","), ...csvRows].join("\n");
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `consultas_alshifa_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   if (profile?.role !== "Admin") {
@@ -748,15 +790,23 @@ export default function AdminDashboard() {
               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <h2 className="text-2xl font-bold text-slate-800">Registo de Consultas</h2>
-                  <div className="relative w-full sm:w-72">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-                    <input 
-                      type="text" 
-                      placeholder="Pesquisar paciente ou ID..."
-                      className="pl-9 pr-4 py-2 w-full bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                    />
+                  <div className="flex gap-3">
+                    <button 
+                      onClick={exportToCSV}
+                      className="flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors shadow-sm whitespace-nowrap"
+                    >
+                      <FileText className="w-4 h-4" /> Exportar CSV
+                    </button>
+                    <div className="relative w-full sm:w-72">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                      <input 
+                        type="text" 
+                        placeholder="Pesquisar paciente ou ID..."
+                        className="pl-9 pr-4 py-2 w-full bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                      />
+                    </div>
                   </div>
                 </div>
 
