@@ -5,7 +5,7 @@ import { supabase } from "../lib/supabase";
 import { useAuth } from "../hooks/useAuth";
 import { analyzeConsultation } from "../lib/gemini";
 import { calculateBMI } from "../lib/utils";
-import { ChevronLeft, Sparkles, Save, Loader2, MapPin, User } from "lucide-react";
+import { ChevronLeft, Sparkles, Save, Loader2, MapPin, User, History } from "lucide-react";
 import { Campaign } from "../types";
 
 export default function EditConsultation() {
@@ -33,6 +33,7 @@ export default function EditConsultation() {
   });
 
   const [aiAnalysis, setAiAnalysis] = useState("");
+  const [previousConsultations, setPreviousConsultations] = useState<any[]>([]);
   const bmi = calculateBMI(Number(formData.weight), Number(formData.height));
 
   useEffect(() => {
@@ -59,6 +60,21 @@ export default function EditConsultation() {
           campaignId: c.campaign_id || "",
         });
         setAiAnalysis(c.ai_analysis);
+
+        // Fetch previous history
+        if (c.patient_name) {
+          const { data: historyData } = await supabase
+            .from('consultations')
+            .select('*')
+            .eq('patient_name', c.patient_name)
+            .neq('consultation_id', id)
+            .order('created_at', { ascending: false })
+            .limit(3);
+          
+          if (historyData) {
+            setPreviousConsultations(historyData);
+          }
+        }
       }
       
       if (campRes.data) setCampaigns(campRes.data);
@@ -184,6 +200,37 @@ export default function EditConsultation() {
                   onChange={(e) => setFormData({ ...formData, patientName: e.target.value })}
                 />
               </div>
+
+              {previousConsultations.length > 0 && (
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                  <h3 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
+                    <History className="w-4 h-4 text-slate-400" />
+                    Histórico do Paciente
+                  </h3>
+                  <div className="space-y-2">
+                    {previousConsultations.map((prev) => (
+                      <div 
+                        key={prev.id}
+                        className="bg-white p-3 rounded-lg border border-slate-200 text-sm"
+                      >
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="font-bold text-slate-900">{prev.patient_name}</span>
+                          <span className="text-xs text-slate-500">{new Date(prev.created_at).toLocaleDateString()}</span>
+                        </div>
+                        <div className="mt-2 pt-2 border-t border-slate-100 flex items-center gap-3 text-xs">
+                          <span className={`${prev.systolic >= 140 || prev.diastolic >= 90 ? 'text-rose-600 font-medium' : 'text-slate-600'}`}>
+                            TA: {prev.blood_pressure}
+                          </span>
+                          <span className={`${prev.glucose >= 7.0 ? 'text-rose-600 font-medium' : 'text-slate-600'}`}>
+                            Glicemia: {prev.glucose}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Idade</label>

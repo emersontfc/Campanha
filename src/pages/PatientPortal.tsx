@@ -2,15 +2,17 @@ import * as React from "react";
 import { useState, useEffect } from "react";
 import { useSearchParams, Link, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
-import { Activity, Phone, User, Printer, Share2, Heart, Sparkles, ShieldCheck, Send, Loader2, MapPin } from "lucide-react";
+import { Activity, Phone, User, Printer, Share2, Heart, Sparkles, ShieldCheck, Send, Loader2, MapPin, History } from "lucide-react";
 import { VerifiedBadge } from "../components/VerifiedBadge";
 import { generateConsultationId, formatMozPhone } from "../lib/utils";
+import Markdown from 'react-markdown';
 
 export default function PatientPortal() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const id = searchParams.get("id");
   const [consultation, setConsultation] = useState<any>(null);
+  const [previousConsultations, setPreviousConsultations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [requesting, setRequesting] = useState(false);
   
@@ -50,6 +52,20 @@ export default function PatientPortal() {
         }
         
         setConsultation(consultationData);
+
+        if (consultationData && consultationData.patient_name) {
+          const { data: historyData } = await supabase
+            .from('consultations')
+            .select('*')
+            .eq('patient_name', consultationData.patient_name)
+            .neq('consultation_id', id)
+            .order('created_at', { ascending: false })
+            .limit(3);
+          
+          if (historyData) {
+            setPreviousConsultations(historyData);
+          }
+        }
       } catch (error) {
         console.error(error);
       } finally {
@@ -111,6 +127,18 @@ export default function PatientPortal() {
     } finally {
       setRequesting(false);
     }
+  };
+
+  const getGlucoseStyles = (glucose: number) => {
+    if (glucose > 7.0) return "border-rose-200 bg-rose-50 text-rose-700";
+    if (glucose < 4.0) return "border-amber-200 bg-amber-50 text-amber-700";
+    return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  };
+
+  const getBPStyles = (systolic: number, diastolic: number) => {
+    if (systolic >= 140 || diastolic >= 90) return "border-rose-200 bg-rose-50 text-rose-700";
+    if (systolic < 90 || diastolic < 60) return "border-amber-200 bg-amber-50 text-amber-700";
+    return "border-emerald-200 bg-emerald-50 text-emerald-700";
   };
 
   if (loading) {
@@ -337,16 +365,49 @@ export default function PatientPortal() {
             <p className="text-[10px] font-bold text-cyan-600 uppercase mb-1">IMC</p>
             <p className="text-xl font-black text-cyan-700">{consultation.bmi.toFixed(1)}</p>
           </div>
-          <div className="bg-white p-4 rounded-2xl border border-slate-100 text-center">
-            <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Glicemia</p>
-            <p className="text-xl font-black text-slate-900">{consultation.glucose}<span className="text-xs font-normal ml-1">mmol/L</span></p>
+          <div className={`p-4 rounded-2xl border text-center ${getGlucoseStyles(consultation.glucose)}`}>
+            <p className="text-[10px] font-bold uppercase mb-1 opacity-70">Glicemia</p>
+            <p className="text-xl font-black">{consultation.glucose}<span className="text-xs font-normal ml-1">mmol/L</span></p>
           </div>
         </div>
 
-        <div className="bg-white p-4 rounded-2xl border border-slate-100 text-center">
-          <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Tensão Arterial</p>
-          <p className="text-2xl font-black text-slate-900">{consultation.blood_pressure}<span className="text-xs font-normal ml-1">mmHg</span></p>
+        <div className={`p-4 rounded-2xl border text-center ${getBPStyles(consultation.systolic, consultation.diastolic)}`}>
+            <p className="text-[10px] font-bold uppercase mb-1 opacity-70">Tensão Arterial</p>
+            <p className="text-2xl font-black">{consultation.blood_pressure}<span className="text-xs font-normal ml-1">mmHg</span></p>
         </div>
+
+        {previousConsultations.length > 0 && (
+          <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm relative overflow-hidden">
+            <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+              <History className="w-5 h-5 text-cyan-600" />
+              Evolução do Paciente
+            </h3>
+            <div className="space-y-3">
+              {previousConsultations.map((prev) => (
+                <div key={prev.id} className="p-4 rounded-xl border border-slate-100 bg-slate-50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-bold text-slate-900">{new Date(prev.created_at).toLocaleDateString()}</p>
+                    <p className="text-xs text-slate-500">Consulta anterior</p>
+                  </div>
+                  <div className="flex gap-4">
+                    <div className="text-center">
+                      <p className="text-[10px] uppercase font-bold text-slate-400">Glicemia</p>
+                      <p className={`font-bold ${getGlucoseStyles(prev.glucose).split(' ').pop()}`}>{prev.glucose}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-[10px] uppercase font-bold text-slate-400">Tensão</p>
+                      <p className={`font-bold ${getBPStyles(prev.systolic, prev.diastolic).split(' ').pop()}`}>{prev.blood_pressure}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-[10px] uppercase font-bold text-slate-400">Peso</p>
+                      <p className="font-bold text-slate-700">{prev.weight}kg</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {consultation.physical_examination && (
           <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm relative overflow-hidden">
@@ -369,8 +430,8 @@ export default function PatientPortal() {
             <Sparkles className="w-5 h-5 text-cyan-600" />
             Análise e Recomendações
           </h3>
-          <div className="prose prose-slate text-slate-600 leading-relaxed whitespace-pre-wrap mb-8">
-            {consultation.ai_analysis}
+          <div className="prose prose-slate text-slate-600 leading-relaxed mb-8">
+            <Markdown>{consultation.ai_analysis}</Markdown>
           </div>
 
           <button

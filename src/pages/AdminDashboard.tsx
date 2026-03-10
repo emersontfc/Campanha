@@ -40,6 +40,11 @@ export default function AdminDashboard() {
   const [showEditUserModal, setShowEditUserModal] = useState(false);
   const [editUserForm, setEditUserForm] = useState({ name: "", role: "", specialty: "" });
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
+  
+  // Create User State
+  const [showNewUserModal, setShowNewUserModal] = useState(false);
+  const [newUserForm, setNewUserForm] = useState({ name: "", email: "", password: "", role: "Profissional", specialty: "" });
+  const [isCreatingUser, setIsCreatingUser] = useState(false);
 
   const navigate = useNavigate();
 
@@ -195,18 +200,68 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleSendPasswordReset = async (email: string) => {
+  const handleSendPasswordReset = async (email: string, phone?: string) => {
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/#/login`,
       });
       if (error) throw error;
-      alert(`Link de recuperação enviado para ${email}`);
+      
+      const resetMessage = `Olá! Foi solicitada a recuperação de senha para a sua conta na Al-Shifa Health. Por favor, verifique o seu email (${email}) para redefinir a sua senha.`;
+      
+      if (phone) {
+        const formattedPhone = phone.replace(/\D/g, "");
+        const url = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(resetMessage)}`;
+        window.open(url, "_blank");
+      } else {
+        alert(`Link de recuperação enviado para ${email}`);
+      }
     } catch (err) {
       console.error("Error sending reset link:", err);
       alert("Erro ao enviar o link de recuperação.");
     }
     setActiveDropdown(null);
+  };
+
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newUserForm.name || !newUserForm.email || !newUserForm.password) return;
+
+    setIsCreatingUser(true);
+    try {
+      // Create user in auth
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: newUserForm.email,
+        password: newUserForm.password,
+        options: {
+          data: {
+            name: newUserForm.name,
+            role: newUserForm.role,
+            specialty: newUserForm.specialty,
+          }
+        }
+      });
+
+      if (authError) throw authError;
+
+      // The profile is created automatically by the trigger, but we might want to update it to be verified immediately since an admin created it
+      if (authData.user) {
+        await supabase
+          .from('profiles')
+          .update({ is_verified: true })
+          .eq('id', authData.user.id);
+      }
+
+      setShowNewUserModal(false);
+      setNewUserForm({ name: "", email: "", password: "", role: "Profissional", specialty: "" });
+      fetchData();
+      alert("Utilizador criado com sucesso!");
+    } catch (err: any) {
+      console.error("Error creating user:", err);
+      alert(`Erro ao criar utilizador: ${err.message}`);
+    } finally {
+      setIsCreatingUser(false);
+    }
   };
 
   const handleDeleteUser = async (userId: string) => {
@@ -224,6 +279,26 @@ export default function AdminDashboard() {
       alert("Erro ao remover o utilizador.");
     }
     setActiveDropdown(null);
+  };
+
+  const handleDeleteConsultation = async (e: React.MouseEvent, consultationId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (!window.confirm("Tem a certeza que deseja eliminar esta consulta? Esta ação não pode ser desfeita.")) return;
+    try {
+      const { error } = await supabase
+        .from('consultations')
+        .delete()
+        .eq('consultation_id', consultationId);
+        
+      if (error) throw error;
+      setConsultations(consultations.filter(c => c.consultation_id !== consultationId));
+      fetchData(); // Refresh stats
+    } catch (err) {
+      console.error("Error deleting consultation:", err);
+      alert("Erro ao eliminar a consulta.");
+    }
   };
 
   if (profile?.role !== "Admin") {
@@ -495,6 +570,12 @@ export default function AdminDashboard() {
                         onChange={(e) => setSearchTerm(e.target.value)}
                       />
                     </div>
+                    <button 
+                      onClick={() => setShowNewUserModal(true)}
+                      className="flex items-center justify-center gap-2 px-4 py-2 bg-sky-600 text-white rounded-lg text-sm font-medium hover:bg-sky-700 transition-colors shadow-sm whitespace-nowrap"
+                    >
+                      <Plus className="w-4 h-4" /> Novo Utilizador
+                    </button>
                   </div>
                 </div>
 
@@ -574,7 +655,7 @@ export default function AdminDashboard() {
                                           <Edit2 className="w-4 h-4" /> Editar Perfil
                                         </button>
                                         <button
-                                          onClick={() => handleSendPasswordReset(u.email)}
+                                          onClick={() => handleSendPasswordReset(u.email, prompt("Digite o número de WhatsApp do utilizador (opcional, com código do país):"))}
                                           className="w-full flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
                                         >
                                           <Key className="w-4 h-4" /> Repor Password
@@ -690,6 +771,7 @@ export default function AdminDashboard() {
                           <th className="px-6 py-4 font-medium">Campanha</th>
                           <th className="px-6 py-4 font-medium">Sinais Vitais</th>
                           <th className="px-6 py-4 font-medium">Status</th>
+                          <th className="px-6 py-4 font-medium text-right">Ações</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-200">
@@ -731,11 +813,20 @@ export default function AdminDashboard() {
                                 {c.status === 'completed' ? 'Concluída' : c.status === 'accepted' ? 'Em Andamento' : 'Pendente'}
                               </span>
                             </td>
+                            <td className="px-6 py-4 text-right">
+                              <button
+                                onClick={(e) => handleDeleteConsultation(e, c.consultation_id)}
+                                className="p-2 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors"
+                                title="Eliminar consulta"
+                              >
+                                <Trash2 className="w-5 h-5" />
+                              </button>
+                            </td>
                           </tr>
                         ))}
                         {filteredConsultations.length === 0 && (
                           <tr>
-                            <td colSpan={6} className="px-6 py-8 text-center text-slate-500">
+                            <td colSpan={7} className="px-6 py-8 text-center text-slate-500">
                               Nenhuma consulta encontrada.
                             </td>
                           </tr>
@@ -797,6 +888,86 @@ export default function AdminDashboard() {
                   </button>
                   <button type="submit" disabled={isCreatingCampaign} className="flex-1 px-4 py-2.5 rounded-lg font-medium text-white bg-sky-600 hover:bg-sky-700 transition-colors disabled:opacity-50">
                     {isCreatingCampaign ? "Criando..." : "Criar Campanha"}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* New User Modal */}
+      <AnimatePresence>
+        {showNewUserModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setShowNewUserModal(false)}
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-white w-full max-w-md rounded-2xl shadow-xl relative z-10 overflow-hidden"
+            >
+              <div className="p-6 border-b border-slate-100 flex justify-between items-center">
+                <h2 className="text-xl font-bold text-slate-800">Novo Utilizador</h2>
+                <button onClick={() => setShowNewUserModal(false)} className="text-slate-400 hover:text-slate-600">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              
+              <form onSubmit={handleCreateUser} className="p-6 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Nome Completo</label>
+                  <input 
+                    required type="text" placeholder="Ex: Dr. João Silva"
+                    className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none transition-all"
+                    value={newUserForm.name} onChange={(e) => setNewUserForm({...newUserForm, name: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
+                  <input 
+                    required type="email" placeholder="Ex: joao.silva@alshifa.com"
+                    className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none transition-all"
+                    value={newUserForm.email} onChange={(e) => setNewUserForm({...newUserForm, email: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Senha Inicial</label>
+                  <input 
+                    required type="password" placeholder="Mínimo 6 caracteres" minLength={6}
+                    className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none transition-all"
+                    value={newUserForm.password} onChange={(e) => setNewUserForm({...newUserForm, password: e.target.value})}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Função</label>
+                    <select 
+                      className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none transition-all bg-white"
+                      value={newUserForm.role} onChange={(e) => setNewUserForm({...newUserForm, role: e.target.value})}
+                    >
+                      <option value="MedicalProfessional">Profissional</option>
+                      <option value="Admin">Administrador</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Especialidade</label>
+                    <input 
+                      type="text" placeholder="Ex: Clínica Geral"
+                      className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none transition-all"
+                      value={newUserForm.specialty} onChange={(e) => setNewUserForm({...newUserForm, specialty: e.target.value})}
+                    />
+                  </div>
+                </div>
+                
+                <div className="flex gap-3 pt-4">
+                  <button type="button" onClick={() => setShowNewUserModal(false)} className="flex-1 px-4 py-2.5 rounded-lg font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors">
+                    Cancelar
+                  </button>
+                  <button type="submit" disabled={isCreatingUser} className="flex-1 px-4 py-2.5 rounded-lg font-medium text-white bg-sky-600 hover:bg-sky-700 transition-colors disabled:opacity-50">
+                    {isCreatingUser ? "Criando..." : "Criar Utilizador"}
                   </button>
                 </div>
               </form>

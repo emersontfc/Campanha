@@ -5,7 +5,7 @@ import { supabase } from "../lib/supabase";
 import { useAuth } from "../hooks/useAuth";
 import { analyzeConsultation } from "../lib/gemini";
 import { calculateBMI, generateConsultationId, formatMozPhone } from "../lib/utils";
-import { ChevronLeft, Sparkles, Save, Loader2, MapPin } from "lucide-react";
+import { ChevronLeft, Sparkles, Save, Loader2, MapPin, History, ArrowRight } from "lucide-react";
 import { Campaign } from "../types";
 
 export default function NewConsultation() {
@@ -29,6 +29,7 @@ export default function NewConsultation() {
   });
 
   const [aiAnalysis, setAiAnalysis] = useState("");
+  const [previousConsultations, setPreviousConsultations] = useState<any[]>([]);
   const bmi = calculateBMI(Number(formData.weight), Number(formData.height));
 
   useEffect(() => {
@@ -41,6 +42,39 @@ export default function NewConsultation() {
     };
     fetchCampaigns();
   }, []);
+
+  useEffect(() => {
+    const fetchPrevious = async () => {
+      if (formData.patientName.length < 3) {
+        setPreviousConsultations([]);
+        return;
+      }
+      const { data } = await supabase
+        .from('consultations')
+        .select('*')
+        .ilike('patient_name', `%${formData.patientName}%`)
+        .order('created_at', { ascending: false })
+        .limit(3);
+      
+      if (data && data.length > 0) {
+        setPreviousConsultations(data);
+      } else {
+        setPreviousConsultations([]);
+      }
+    };
+
+    const timeoutId = setTimeout(fetchPrevious, 500);
+    return () => clearTimeout(timeoutId);
+  }, [formData.patientName]);
+
+  const handleSelectPreviousPatient = (patient: any) => {
+    setFormData(prev => ({
+      ...prev,
+      patientName: patient.patient_name,
+      patientAge: String(patient.patient_age),
+      patientPhone: patient.patient_phone,
+    }));
+  };
 
   const handleGenerateAI = async () => {
     if (!formData.weight || !formData.height || !formData.systolic || !formData.diastolic || !formData.glucose) {
@@ -177,6 +211,41 @@ export default function NewConsultation() {
                 onChange={(e) => setFormData({ ...formData, patientName: e.target.value })}
               />
             </div>
+
+            {previousConsultations.length > 0 && (
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                <h3 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
+                  <History className="w-4 h-4 text-slate-400" />
+                  Histórico Encontrado (Clique para preencher)
+                </h3>
+                <div className="space-y-2">
+                  {previousConsultations.map((prev) => (
+                    <div 
+                      key={prev.id}
+                      onClick={() => handleSelectPreviousPatient(prev)}
+                      className="bg-white p-3 rounded-lg border border-slate-200 cursor-pointer hover:border-cyan-300 hover:shadow-sm transition-all text-sm"
+                    >
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="font-bold text-slate-900">{prev.patient_name}</span>
+                        <span className="text-xs text-slate-500">{new Date(prev.created_at).toLocaleDateString()}</span>
+                      </div>
+                      <div className="flex items-center gap-4 text-xs text-slate-600">
+                        <span>Idade: {prev.patient_age}</span>
+                        <span>Tel: {prev.patient_phone}</span>
+                      </div>
+                      <div className="mt-2 pt-2 border-t border-slate-100 flex items-center gap-3 text-xs">
+                        <span className={`${prev.systolic >= 140 || prev.diastolic >= 90 ? 'text-rose-600 font-medium' : 'text-slate-600'}`}>
+                          TA: {prev.blood_pressure}
+                        </span>
+                        <span className={`${prev.glucose >= 7.0 ? 'text-rose-600 font-medium' : 'text-slate-600'}`}>
+                          Glicemia: {prev.glucose}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <div>

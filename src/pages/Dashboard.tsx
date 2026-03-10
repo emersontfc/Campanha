@@ -1,7 +1,8 @@
+import * as React from "react";
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../hooks/useAuth";
-import { Plus, Users, ClipboardList, Activity, LogOut, ShieldCheck, Wifi, WifiOff, Loader2 } from "lucide-react";
+import { Plus, Users, ClipboardList, Activity, LogOut, ShieldCheck, Wifi, WifiOff, Loader2, Trash2 } from "lucide-react";
 import { VerifiedBadge } from "../components/VerifiedBadge";
 import { Link, useNavigate } from "react-router-dom";
 
@@ -13,6 +14,7 @@ export default function Dashboard() {
   const [acceptedRequests, setAcceptedRequests] = useState<any[]>([]);
   const [isOnline, setIsOnline] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -120,6 +122,33 @@ export default function Dashboard() {
     } catch (error) {
       console.error("Error accepting request:", error);
       alert("Erro ao aceitar solicitação.");
+    }
+  };
+
+  const handleDeleteConsultation = async (e: React.MouseEvent, consultationId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (!window.confirm("Tem a certeza que deseja eliminar esta consulta? Esta ação não pode ser desfeita.")) {
+      return;
+    }
+
+    setDeletingId(consultationId);
+    try {
+      const { error } = await supabase
+        .from('consultations')
+        .delete()
+        .eq('consultation_id', consultationId);
+        
+      if (error) throw error;
+      
+      setRecentConsultations(prev => prev.filter(c => c.consultation_id !== consultationId));
+      setStats(prev => ({ ...prev, total: prev.total - 1 }));
+    } catch (error) {
+      console.error("Error deleting consultation:", error);
+      alert("Erro ao eliminar a consulta.");
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -302,12 +331,26 @@ export default function Dashboard() {
                   className="block bg-white p-4 rounded-2xl border border-slate-100 shadow-sm active:bg-slate-50 transition-colors"
                 >
                   <div className="flex justify-between items-start mb-2">
-                    <span className="font-bold text-slate-900">{c.consultation_id}</span>
-                    <span className="text-[10px] font-bold bg-cyan-50 text-cyan-700 px-2 py-1 rounded-full uppercase">
-                      {new Date(c.created_at).toLocaleDateString()}
-                    </span>
+                    <div>
+                      <span className="font-bold text-slate-900 block">{c.consultation_id}</span>
+                      <span className="text-[10px] font-bold bg-cyan-50 text-cyan-700 px-2 py-1 rounded-full uppercase inline-block mt-1">
+                        {new Date(c.created_at).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <button
+                      onClick={(e) => handleDeleteConsultation(e, c.consultation_id)}
+                      disabled={deletingId === c.consultation_id}
+                      className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                      title="Eliminar Consulta"
+                    >
+                      {deletingId === c.consultation_id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="w-4 h-4" />
+                      )}
+                    </button>
                   </div>
-                  <div className="flex gap-4 text-sm text-slate-500">
+                  <div className="flex gap-4 text-sm text-slate-500 mt-2">
                     <span>IMC: {c.bmi.toFixed(1)}</span>
                     <span>TA: {c.blood_pressure}</span>
                   </div>
