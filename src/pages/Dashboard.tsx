@@ -135,12 +135,18 @@ export default function Dashboard() {
 
     setDeletingId(id);
     try {
-      const { error } = await supabase
+      // Use select() to verify if the row was actually deleted (RLS check)
+      const { error, data } = await supabase
         .from('consultations')
         .delete()
-        .eq('id', id);
+        .eq('id', id)
+        .select();
         
       if (error) throw error;
+      
+      if (!data || data.length === 0) {
+        throw new Error("Não tem permissão para eliminar esta consulta ou o registo já não existe.");
+      }
       
       setRecentConsultations(prev => prev.filter(c => c.id !== id));
       setStats(prev => ({ ...prev, total: Math.max(0, prev.total - 1) }));

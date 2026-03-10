@@ -287,12 +287,18 @@ export default function AdminDashboard() {
     
     if (!window.confirm("Tem a certeza que deseja eliminar esta consulta? Esta ação não pode ser desfeita.")) return;
     try {
-      const { error } = await supabase
+      const { error, data } = await supabase
         .from('consultations')
         .delete()
-        .eq('id', id);
+        .eq('id', id)
+        .select();
         
       if (error) throw error;
+      
+      if (!data || data.length === 0) {
+        throw new Error("Não tem permissão para eliminar esta consulta ou o registo já não existe.");
+      }
+
       setConsultations(consultations.filter(c => c.id !== id));
       fetchData(); // Refresh stats
       alert("Consulta eliminada com sucesso.");

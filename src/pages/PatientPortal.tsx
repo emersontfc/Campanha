@@ -98,19 +98,27 @@ export default function PatientPortal() {
     setRequesting(true);
     
     try {
-      // Create consultation request in general pool
       const consultationId = generateConsultationId();
       
-      // Get ANY campaign to satisfy NOT NULL constraints
-      // Try active first, then any, then fail gracefully
-      const { data: allCampaigns } = await supabase
+      // 1. Get a valid professional_id and campaign_id to satisfy DB constraints
+      // We need a professional_id because the DB has a NOT NULL constraint on it
+      const { data: professionals } = await supabase
+        .from('profiles')
+        .select('id')
+        .limit(1);
+
+      const { data: campaigns } = await supabase
         .from('campaigns')
         .select('id')
         .order('active', { ascending: false })
         .limit(1);
 
-      if (!allCampaigns || allCampaigns.length === 0) {
-        throw new Error("Não existem campanhas configuradas. O administrador deve criar uma campanha primeiro.");
+      if (!professionals || professionals.length === 0) {
+        throw new Error("Não existem profissionais registados no sistema.");
+      }
+      
+      if (!campaigns || campaigns.length === 0) {
+        throw new Error("Não existem campanhas configuradas.");
       }
 
       const insertData: any = {
@@ -131,7 +139,8 @@ export default function PatientPortal() {
         cvd_risk_score: 0,
         ai_analysis: `SOLICITAÇÃO DE CONSULTA\n\nMotivo: ${formData.reason}`,
         status: 'pending',
-        campaign_id: allCampaigns[0].id
+        professional_id: professionals[0].id, // Temporary anchor to satisfy NOT NULL
+        campaign_id: campaigns[0].id
       };
 
       const { error: consError } = await supabase
@@ -140,12 +149,11 @@ export default function PatientPortal() {
         
       if (consError) throw consError;
       
-      // Force a small delay to ensure DB consistency before navigation
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 800));
       navigate(`/patient?id=${consultationId}`);
     } catch (err: any) {
-      console.error("Request Error:", err);
-      alert(`Erro ao solicitar consulta: ${err.message || "Erro de conexão com o servidor"}`);
+      console.error("Detailed Request Error:", err);
+      alert(`Erro ao solicitar consulta: ${err.message || "Erro de integridade de dados"}`);
     } finally {
       setRequesting(false);
     }
