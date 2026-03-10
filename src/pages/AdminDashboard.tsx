@@ -6,7 +6,8 @@ import {
   ShieldCheck, UserCheck, UserX, ChevronLeft, Search, 
   BarChart3, TrendingUp, Users, Activity, Download, 
   Filter, Calendar, MapPin, ArrowUpRight, ArrowDownRight, Plus, Sparkles,
-  PieChart as PieChartIcon, LayoutDashboard, Settings
+  PieChart as PieChartIcon, LayoutDashboard, Settings,
+  MoreVertical, Edit2, Key, Trash2
 } from "lucide-react";
 import { VerifiedBadge } from "../components/VerifiedBadge";
 import { useNavigate } from "react-router-dom";
@@ -35,6 +36,12 @@ export default function AdminDashboard() {
   const [showSettings, setShowSettings] = useState(false);
   const [newCampaign, setNewCampaign] = useState({ name: "", location: "" });
   const [isCreatingCampaign, setIsCreatingCampaign] = useState(false);
+
+  // User Management State
+  const [editingUser, setEditingUser] = useState<any | null>(null);
+  const [showEditUserModal, setShowEditUserModal] = useState(false);
+  const [editUserForm, setEditUserForm] = useState({ name: "", role: "", specialty: "" });
+  const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
 
   const navigate = useNavigate();
 
@@ -151,6 +158,61 @@ export default function AdminDashboard() {
     } catch (err) {
       console.error(err);
     }
+  };
+
+  const handleEditUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingUser) return;
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          name: editUserForm.name,
+          role: editUserForm.role,
+          specialty: editUserForm.specialty
+        })
+        .eq('id', editingUser.id);
+      
+      if (error) throw error;
+      
+      setUsers(users.map(u => u.id === editingUser.id ? { ...u, ...editUserForm } : u));
+      setShowEditUserModal(false);
+      setEditingUser(null);
+    } catch (err) {
+      console.error("Error updating user:", err);
+      alert("Erro ao atualizar o utilizador.");
+    }
+  };
+
+  const handleSendPasswordReset = async (email: string) => {
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/#/login`,
+      });
+      if (error) throw error;
+      alert(`Link de recuperação enviado para ${email}`);
+    } catch (err) {
+      console.error("Error sending reset link:", err);
+      alert("Erro ao enviar o link de recuperação.");
+    }
+    setActiveDropdown(null);
+  };
+
+  const handleDeleteUser = async (userId: string) => {
+    if (!window.confirm("Tem a certeza que deseja remover este utilizador? Esta ação não pode ser desfeita.")) return;
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('id', userId);
+        
+      if (error) throw error;
+      setUsers(users.filter(u => u.id !== userId));
+    } catch (err) {
+      console.error("Error deleting user:", err);
+      alert("Erro ao remover o utilizador.");
+    }
+    setActiveDropdown(null);
   };
 
   if (profile?.role !== "Admin") {
@@ -579,12 +641,63 @@ export default function AdminDashboard() {
                         </div>
                       </div>
                       
-                      <button
-                        onClick={() => toggleVerification(u.id, u.is_verified)}
-                        className={`p-5 rounded-[1.5rem] transition-all active:scale-90 shadow-lg ${u.is_verified ? 'bg-rose-50 text-rose-500 hover:bg-rose-100 shadow-rose-100/50' : 'bg-cyan-50 text-cyan-600 hover:bg-cyan-100 shadow-cyan-100/50'}`}
-                      >
-                        {u.is_verified ? <UserX className="w-7 h-7" /> : <UserCheck className="w-7 h-7" />}
-                      </button>
+                      <div className="flex items-center gap-3 relative">
+                        <button
+                          onClick={() => toggleVerification(u.id, u.is_verified)}
+                          className={`p-4 rounded-[1.5rem] transition-all active:scale-90 shadow-sm ${u.is_verified ? 'bg-rose-50 text-rose-500 hover:bg-rose-100' : 'bg-cyan-50 text-cyan-600 hover:bg-cyan-100'}`}
+                          title={u.is_verified ? "Remover Verificação" : "Verificar Utilizador"}
+                        >
+                          {u.is_verified ? <UserX className="w-6 h-6" /> : <UserCheck className="w-6 h-6" />}
+                        </button>
+                        
+                        <div className="relative">
+                          <button
+                            onClick={() => setActiveDropdown(activeDropdown === u.id ? null : u.id)}
+                            className="p-4 rounded-[1.5rem] bg-slate-50 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-all"
+                          >
+                            <MoreVertical className="w-6 h-6" />
+                          </button>
+                          
+                          <AnimatePresence>
+                            {activeDropdown === u.id && (
+                              <motion.div
+                                initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                                animate={{ opacity: 1, scale: 1, y: 0 }}
+                                exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                                className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-50"
+                              >
+                                <button
+                                  onClick={() => {
+                                    setEditingUser(u);
+                                    setEditUserForm({ name: u.name, role: u.role, specialty: u.specialty });
+                                    setShowEditUserModal(true);
+                                    setActiveDropdown(null);
+                                  }}
+                                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors"
+                                >
+                                  <Edit2 className="w-4 h-4" />
+                                  Editar Perfil
+                                </button>
+                                <button
+                                  onClick={() => handleSendPasswordReset(u.email)}
+                                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors"
+                                >
+                                  <Key className="w-4 h-4" />
+                                  Repor Palavra-passe
+                                </button>
+                                <div className="h-px bg-slate-100 my-1 mx-4" />
+                                <button
+                                  onClick={() => handleDeleteUser(u.id)}
+                                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-bold text-rose-600 hover:bg-rose-50 transition-colors"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                  Remover Utilizador
+                                </button>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
+                      </div>
                     </motion.div>
                   ))}
                 </AnimatePresence>
@@ -652,6 +765,80 @@ export default function AdminDashboard() {
                     className="flex-1 px-6 py-4 rounded-2xl font-bold bg-cyan-600 text-white hover:bg-cyan-700 transition-all shadow-lg shadow-cyan-100 disabled:opacity-50"
                   >
                     {isCreatingCampaign ? "Criando..." : "Criar Campanha"}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Edit User Modal */}
+      <AnimatePresence>
+        {showEditUserModal && editingUser && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowEditUserModal(false)}
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="bg-white w-full max-w-md rounded-[3rem] p-10 shadow-2xl relative z-10"
+            >
+              <h2 className="text-2xl font-black text-slate-900 mb-2">Editar Utilizador</h2>
+              <p className="text-sm text-slate-500 mb-8">Atualize os dados do perfil de {editingUser.name}.</p>
+              
+              <form onSubmit={handleEditUser} className="space-y-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nome Completo</label>
+                  <input 
+                    required
+                    type="text"
+                    className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:ring-2 focus:ring-cyan-500 outline-none font-bold text-slate-900 transition-all"
+                    value={editUserForm.name}
+                    onChange={(e) => setEditUserForm({...editUserForm, name: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Função</label>
+                  <select 
+                    required
+                    className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:ring-2 focus:ring-cyan-500 outline-none font-bold text-slate-900 transition-all appearance-none"
+                    value={editUserForm.role}
+                    onChange={(e) => setEditUserForm({...editUserForm, role: e.target.value})}
+                  >
+                    <option value="MedicalProfessional">Profissional de Saúde</option>
+                    <option value="Admin">Administrador</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Especialidade</label>
+                  <input 
+                    type="text"
+                    className="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 focus:ring-2 focus:ring-cyan-500 outline-none font-bold text-slate-900 transition-all"
+                    value={editUserForm.specialty}
+                    onChange={(e) => setEditUserForm({...editUserForm, specialty: e.target.value})}
+                  />
+                </div>
+                
+                <div className="flex gap-3 pt-4">
+                  <button 
+                    type="button"
+                    onClick={() => setShowEditUserModal(false)}
+                    className="flex-1 px-6 py-4 rounded-2xl font-bold text-slate-500 hover:bg-slate-50 transition-all"
+                  >
+                    Cancelar
+                  </button>
+                  <button 
+                    type="submit"
+                    className="flex-1 px-6 py-4 rounded-2xl font-bold bg-cyan-600 text-white hover:bg-cyan-700 transition-all shadow-lg shadow-cyan-100"
+                  >
+                    Guardar
                   </button>
                 </div>
               </form>
