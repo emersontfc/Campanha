@@ -1,7 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
-
 export async function analyzeConsultation(data: {
   weight: number;
   height: number;
@@ -10,7 +8,15 @@ export async function analyzeConsultation(data: {
   diastolic: number;
   glucose: number;
 }) {
-  const model = "gemini-2.5-flash-latest";
+  const model = "gemini-3-flash-preview";
+  
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    console.error("GEMINI_API_KEY is missing");
+    return "Erro: Chave API do Gemini não configurada. Por favor, adicione GEMINI_API_KEY nas definições do projeto.";
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
   
   const systemInstruction = `Você é um Arquiteto de Saúde e Médico Especialista da Al-Shifa Health Initiative em Moçambique.
 Sua tarefa é analisar dados biométricos de triagens comunitárias e gerar um relatório humanizado, preventivo e educativo.

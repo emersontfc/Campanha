@@ -1,30 +1,69 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../hooks/useAuth";
-import { Plus, Users, ClipboardList, Activity, LogOut, ShieldCheck } from "lucide-react";
+import { Plus, Users, ClipboardList, Activity, LogOut, ShieldCheck, Wifi, WifiOff, Loader2 } from "lucide-react";
+import { VerifiedBadge } from "../components/VerifiedBadge";
 import { Link, useNavigate } from "react-router-dom";
 
 export default function Dashboard() {
   const { user, profile } = useAuth();
   const [stats, setStats] = useState({ total: 0, today: 0 });
   const [recentConsultations, setRecentConsultations] = useState<any[]>([]);
+  const [pendingRequests, setPendingRequests] = useState<any[]>([]);
+  const [isOnline, setIsOnline] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (profile) {
+      setIsOnline(profile.is_online || false);
+    }
+  }, [profile]);
+
+  const toggleOnlineStatus = async () => {
+    if (!user) return;
+    setUpdatingStatus(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ is_online: !isOnline })
+        .eq('id', user.id);
+      
+      if (error) throw error;
+      setIsOnline(!isOnline);
+    } catch (error) {
+      console.error("Error updating status:", error);
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
 
   useEffect(() => {
     if (!user) return;
 
     const fetchData = async () => {
       try {
-        const { data, error, count } = await supabase
+        // Fetch recent completed/filled consultations
+        const { data: recent, count } = await supabase
           .from('consultations')
           .select('*', { count: 'exact' })
           .eq('professional_id', user.id)
+          .gt('weight', 0) // Only those with data
           .order('created_at', { ascending: false })
           .limit(5);
         
-        if (error) throw error;
-        setRecentConsultations(data || []);
+        setRecentConsultations(recent || []);
         setStats({ total: count || 0, today: 0 });
+
+        // Fetch pending requests assigned to this doctor
+        const { data: pending } = await supabase
+          .from('consultations')
+          .select('*')
+          .eq('professional_id', user.id)
+          .eq('weight', 0) // Requests have 0 weight initially
+          .order('created_at', { ascending: false });
+        
+        setPendingRequests(pending || []);
       } catch (error) {
         console.error("Error fetching consultations:", error);
       }
@@ -47,7 +86,10 @@ export default function Dashboard() {
               <Activity className="w-6 h-6" />
             </div>
             <div>
-              <h1 className="font-bold text-slate-900">Al-Shifa Health</h1>
+              <div className="flex items-center gap-2">
+                <h1 className="font-bold text-slate-900">Al-Shifa Health</h1>
+                {profile?.is_verified && <VerifiedBadge size="sm" />}
+              </div>
               <p className="text-xs text-slate-500">Olá, {profile?.name}</p>
             </div>
           </div>
@@ -71,13 +113,30 @@ export default function Dashboard() {
         )}
 
         <div className="grid grid-cols-2 gap-4">
-          <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
-            <p className="text-slate-500 text-xs font-medium uppercase tracking-wider mb-1">Total Consultas</p>
+          <button
+            onClick={toggleOnlineStatus}
+            disabled={updatingStatus}
+            className={`p-4 rounded-2xl border transition-all flex flex-col items-center justify-center gap-2 ${
+              isOnline 
+                ? "bg-emerald-50 border-emerald-100 text-emerald-700" 
+                : "bg-slate-100 border-slate-200 text-slate-500"
+            }`}
+          >
+            {updatingStatus ? (
+              <Loader2 className="w-6 h-6 animate-spin" />
+            ) : isOnline ? (
+              <Wifi className="w-6 h-6" />
+            ) : (
+              <WifiOff className="w-6 h-6" />
+            )}
+            <span className="text-xs font-bold uppercase tracking-wider">
+              {isOnline ? "Online" : "Offline"}
+            </span>
+          </button>
+
+          <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col items-center justify-center">
+            <p className="text-slate-500 text-[10px] font-bold uppercase tracking-wider mb-1">Total Consultas</p>
             <p className="text-2xl font-bold text-slate-900">{stats.total}</p>
-          </div>
-          <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
-            <p className="text-slate-500 text-xs font-medium uppercase tracking-wider mb-1">Hoje</p>
-            <p className="text-2xl font-bold text-cyan-600">{stats.today}</p>
           </div>
         </div>
 
@@ -108,6 +167,39 @@ export default function Dashboard() {
                   <span className="font-semibold">Painel Administrativo</span>
                 </div>
               </Link>
+            )}
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <div className="flex items-center justify-between px-1">
+            <h2 className="font-bold text-slate-900">Solicitações Pendentes</h2>
+            <span className="bg-amber-100 text-amber-700 text-[10px] font-bold px-2 py-1 rounded-full uppercase">
+              {pendingRequests.length} Novas
+            </span>
+          </div>
+          <div className="space-y-3">
+            {pendingRequests.length === 0 ? (
+              <div className="bg-white p-6 rounded-2xl border border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-400">
+                <p className="text-xs">Nenhuma solicitação pendente</p>
+              </div>
+            ) : (
+              pendingRequests.map((r) => (
+                <Link
+                  key={r.id}
+                  to={`/edit-consultation?id=${r.consultation_id}`}
+                  className="block bg-white p-4 rounded-2xl border-2 border-amber-100 shadow-sm active:bg-amber-50 transition-colors relative overflow-hidden"
+                >
+                  <div className="absolute top-0 right-0 w-1 h-full bg-amber-400" />
+                  <div className="flex justify-between items-start mb-2">
+                    <span className="font-bold text-slate-900">{r.patient_name}</span>
+                    <span className="text-[10px] font-bold text-slate-400">
+                      {new Date(r.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 line-clamp-1">{r.ai_analysis.split('\n\n')[1]?.replace('Motivo: ', '')}</p>
+                </Link>
+              ))
             )}
           </div>
         </div>

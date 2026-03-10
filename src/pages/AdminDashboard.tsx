@@ -8,6 +8,7 @@ import {
   Filter, Calendar, MapPin, ArrowUpRight, ArrowDownRight, Plus, Sparkles,
   PieChart as PieChartIcon, LayoutDashboard, Settings
 } from "lucide-react";
+import { VerifiedBadge } from "../components/VerifiedBadge";
 import { useNavigate } from "react-router-dom";
 import { DashboardStats, Campaign } from "../types";
 import { 
@@ -568,7 +569,7 @@ export default function AdminDashboard() {
                         <div className="min-w-0">
                           <h3 className="text-xl font-black text-slate-900 flex items-center gap-2 truncate tracking-tight">
                             {u.name}
-                            {u.is_verified && <ShieldCheck className="w-5 h-5 text-cyan-600" />}
+                            {u.is_verified && <VerifiedBadge />}
                           </h3>
                           <div className="flex items-center gap-2 mb-1">
                             <span className="text-[10px] font-black text-cyan-600 uppercase tracking-widest bg-cyan-50 px-2 py-0.5 rounded-md">{u.specialty}</span>

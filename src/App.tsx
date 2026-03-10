@@ -7,6 +7,7 @@ import LandingPage from "./pages/LandingPage";
 import Dashboard from "./pages/Dashboard";
 import NewConsultation from "./pages/NewConsultation";
 import PatientPortal from "./pages/PatientPortal";
+import EditConsultation from "./pages/EditConsultation";
 import AdminDashboard from "./pages/AdminDashboard";
 import PendingVerification from "./pages/PendingVerification";
 import { ShieldAlert } from "lucide-react";
@@ -60,6 +61,14 @@ export default function App() {
             element={
               <ProtectedRoute requireVerified>
                 <NewConsultation />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/edit-consultation" 
+            element={
+              <ProtectedRoute requireVerified>
+                <EditConsultation />
               </ProtectedRoute>
             } 
           />

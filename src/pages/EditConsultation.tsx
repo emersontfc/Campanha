@@ -1,17 +1,21 @@
 import * as React from "react";
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../hooks/useAuth";
 import { analyzeConsultation } from "../lib/gemini";
-import { calculateBMI, generateConsultationId, formatMozPhone } from "../lib/utils";
-import { ChevronLeft, Sparkles, Save, Loader2, MapPin } from "lucide-react";
+import { calculateBMI } from "../lib/utils";
+import { ChevronLeft, Sparkles, Save, Loader2, MapPin, User } from "lucide-react";
 import { Campaign } from "../types";
 
-export default function NewConsultation() {
-  const { user, profile } = useAuth();
+export default function EditConsultation() {
+  const { user } = useAuth();
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
+  const [searchParams] = useSearchParams();
+  const id = searchParams.get("id");
+  
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   
@@ -31,15 +35,36 @@ export default function NewConsultation() {
   const bmi = calculateBMI(Number(formData.weight), Number(formData.height));
 
   useEffect(() => {
-    const fetchCampaigns = async () => {
-      const { data } = await supabase
-        .from('campaigns')
-        .select('*')
-        .eq('active', true);
-      if (data) setCampaigns(data);
+    const fetchData = async () => {
+      if (!id) return;
+      
+      const [consRes, campRes] = await Promise.all([
+        supabase.from('consultations').select('*').eq('consultation_id', id).single(),
+        supabase.from('campaigns').select('*').eq('active', true)
+      ]);
+
+      if (consRes.data) {
+        const c = consRes.data;
+        setFormData({
+          patientName: c.patient_name,
+          patientAge: String(c.patient_age),
+          patientPhone: c.patient_phone,
+          weight: c.weight > 0 ? String(c.weight) : "",
+          height: c.height > 0 ? String(c.height) : "",
+          systolic: c.systolic > 0 ? String(c.systolic) : "",
+          diastolic: c.diastolic > 0 ? String(c.diastolic) : "",
+          glucose: c.glucose > 0 ? String(c.glucose) : "",
+          campaignId: c.campaign_id || "",
+        });
+        setAiAnalysis(c.ai_analysis);
+      }
+      
+      if (campRes.data) setCampaigns(campRes.data);
+      setLoading(false);
     };
-    fetchCampaigns();
-  }, []);
+    
+    fetchData();
+  }, [id]);
 
   const handleGenerateAI = async () => {
     if (!formData.weight || !formData.height || !formData.systolic || !formData.diastolic || !formData.glucose) {
@@ -79,45 +104,45 @@ export default function NewConsultation() {
       return;
     }
     
-    setLoading(true);
-    const consultationId = generateConsultationId();
-    
+    setSaving(true);
     try {
       const { error } = await supabase
         .from('consultations')
-        .insert([
-          {
-            consultation_id: consultationId,
-            professional_id: user.id,
-            campaign_id: formData.campaignId,
-            professional_name: profile?.name,
-            patient_name: formData.patientName,
-            patient_age: Number(formData.patientAge),
-            patient_phone: formatMozPhone(formData.patientPhone),
-            weight: Number(formData.weight),
-            height: Number(formData.height),
-            bmi: Number(bmi.toFixed(1)),
-            blood_pressure: `${formData.systolic}/${formData.diastolic}`,
-            systolic: Number(formData.systolic),
-            diastolic: Number(formData.diastolic),
-            glucose: Number(formData.glucose),
-            ai_analysis: aiAnalysis,
-          }
-        ]);
+        .update({
+          campaign_id: formData.campaignId,
+          patient_name: formData.patientName,
+          patient_age: Number(formData.patientAge),
+          weight: Number(formData.weight),
+          height: Number(formData.height),
+          bmi: Number(bmi.toFixed(1)),
+          blood_pressure: `${formData.systolic}/${formData.diastolic}`,
+          systolic: Number(formData.systolic),
+          diastolic: Number(formData.diastolic),
+          glucose: Number(formData.glucose),
+          ai_analysis: aiAnalysis,
+        })
+        .eq('consultation_id', id);
         
       if (error) {
-        console.error("Supabase Insert Error:", error);
+        console.error("Supabase Update Error:", error);
         throw error;
       }
-      
-      navigate(`/patient?id=${consultationId}`);
+      navigate(`/patient?id=${id}`);
     } catch (err: any) {
-      console.error("Save Error:", err);
+      console.error("Finalize Error:", err);
       alert(`Erro ao salvar consulta: ${err.message || "Erro desconhecido"}`);
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-slate-50">
+        <Loader2 className="w-8 h-8 text-cyan-500 animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 pb-10">
@@ -126,7 +151,7 @@ export default function NewConsultation() {
           <button onClick={() => navigate(-1)} className="p-2 -ml-2 text-slate-500">
             <ChevronLeft className="w-6 h-6" />
           </button>
-          <h1 className="font-bold text-slate-900">Nova Triagem</h1>
+          <h1 className="font-bold text-slate-900">Completar Triagem</h1>
         </div>
       </header>
 
@@ -134,12 +159,49 @@ export default function NewConsultation() {
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4">
             <h2 className="font-bold text-slate-900 mb-2 flex items-center gap-2">
-              <MapPin className="w-5 h-5 text-cyan-600" />
-              Campanha & Paciente
+              <User className="w-5 h-5 text-cyan-600" />
+              Dados do Paciente
             </h2>
             
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Campanha Ativa</label>
+            <div className="grid grid-cols-1 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Nome do Paciente</label>
+                <input
+                  type="text"
+                  required
+                  className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-cyan-500 outline-none"
+                  value={formData.patientName}
+                  onChange={(e) => setFormData({ ...formData, patientName: e.target.value })}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Idade</label>
+                  <input
+                    type="number"
+                    required
+                    className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-cyan-500 outline-none"
+                    value={formData.patientAge}
+                    onChange={(e) => setFormData({ ...formData, patientAge: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Telemóvel</label>
+                  <input
+                    type="text"
+                    disabled
+                    className="w-full px-4 py-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-500"
+                    value={formData.patientPhone}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-slate-50">
+              <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-cyan-600" />
+                Vincular a Campanha
+              </label>
               <select
                 required
                 className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-cyan-500 outline-none bg-white"
@@ -151,43 +213,6 @@ export default function NewConsultation() {
                   <option key={c.id} value={c.id}>{c.name} ({c.location})</option>
                 ))}
               </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Nome do Paciente</label>
-              <input
-                type="text"
-                placeholder="Nome Completo"
-                required
-                className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-cyan-500 outline-none"
-                value={formData.patientName}
-                onChange={(e) => setFormData({ ...formData, patientName: e.target.value })}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Idade</label>
-                <input
-                  type="number"
-                  placeholder="Ex: 45"
-                  required
-                  className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-cyan-500 outline-none"
-                  value={formData.patientAge}
-                  onChange={(e) => setFormData({ ...formData, patientAge: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Telemóvel (+258)</label>
-                <input
-                  type="tel"
-                  placeholder="840000000"
-                  required
-                  className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-cyan-500 outline-none"
-                  value={formData.patientPhone}
-                  onChange={(e) => setFormData({ ...formData, patientPhone: e.target.value })}
-                />
-              </div>
             </div>
           </div>
 
@@ -228,7 +253,6 @@ export default function NewConsultation() {
                 <label className="block text-sm font-medium text-slate-700 mb-1">Sistólica (mmHg)</label>
                 <input
                   type="number"
-                  placeholder="120"
                   required
                   className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-cyan-500 outline-none"
                   value={formData.systolic}
@@ -239,7 +263,6 @@ export default function NewConsultation() {
                 <label className="block text-sm font-medium text-slate-700 mb-1">Diastólica (mmHg)</label>
                 <input
                   type="number"
-                  placeholder="80"
                   required
                   className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-cyan-500 outline-none"
                   value={formData.diastolic}
@@ -254,7 +277,6 @@ export default function NewConsultation() {
                 type="number"
                 step="0.1"
                 required
-                placeholder="Ex: 5.5"
                 className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-cyan-500 outline-none"
                 value={formData.glucose}
                 onChange={(e) => setFormData({ ...formData, glucose: e.target.value })}
@@ -278,7 +300,6 @@ export default function NewConsultation() {
             
             <textarea
               className="w-full h-40 px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-cyan-500 outline-none text-sm text-slate-600"
-              placeholder="A análise da IA aparecerá aqui..."
               value={aiAnalysis}
               onChange={(e) => setAiAnalysis(e.target.value)}
             />
@@ -286,11 +307,11 @@ export default function NewConsultation() {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={saving}
             className="w-full bg-slate-900 text-white font-bold py-4 rounded-2xl shadow-lg flex items-center justify-center gap-2 active:scale-[0.98] transition-all disabled:opacity-50"
           >
-            {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-            Finalizar e Salvar Triagem
+            {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+            Finalizar Atendimento
           </button>
         </form>
       </main>

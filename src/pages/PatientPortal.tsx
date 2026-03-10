@@ -1,21 +1,36 @@
+import * as React from "react";
 import { useState, useEffect } from "react";
-import { useSearchParams, Link } from "react-router-dom";
+import { useSearchParams, Link, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
-import { Activity, Phone, User, Printer, Share2, Heart, Sparkles } from "lucide-react";
+import { Activity, Phone, User, Printer, Share2, Heart, Sparkles, ShieldCheck, Send, Loader2, MapPin } from "lucide-react";
+import { VerifiedBadge } from "../components/VerifiedBadge";
+import { generateConsultationId, formatMozPhone } from "../lib/utils";
 
 export default function PatientPortal() {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const id = searchParams.get("id");
   const [consultation, setConsultation] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [requesting, setRequesting] = useState(false);
+  
+  const [formData, setFormData] = useState({
+    name: "",
+    age: "",
+    phone: "",
+    reason: ""
+  });
 
   useEffect(() => {
-    if (!id) return;
+    if (!id) {
+      setLoading(false);
+      return;
+    }
 
     const fetchData = async () => {
       const { data, error } = await supabase
         .from('consultations')
-        .select('*')
+        .select('*, profiles:professional_id(is_verified)')
         .eq('consultation_id', id)
         .single();
         
@@ -36,10 +51,159 @@ export default function PatientPortal() {
     window.open(url, "_blank");
   };
 
+  const handleRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setRequesting(true);
+    
+    try {
+      // 1. Get online doctors
+      const { data: doctors, error: docError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('role', 'professional')
+        .eq('is_online', true)
+        .eq('is_verified', true);
+        
+      if (docError) throw docError;
+      
+      if (!doctors || doctors.length === 0) {
+        alert("Desculpe, não há médicos online no momento. Por favor, tente mais tarde.");
+        setRequesting(false);
+        return;
+      }
+      
+      // 2. Pick random doctor
+      const randomDoctor = doctors[Math.floor(Math.random() * doctors.length)];
+      
+      // 3. Create consultation request
+      const consultationId = generateConsultationId();
+      const { error: consError } = await supabase
+        .from('consultations')
+        .insert([{
+          consultation_id: consultationId,
+          professional_id: randomDoctor.id,
+          professional_name: randomDoctor.name,
+          patient_name: formData.name,
+          patient_age: Number(formData.age),
+          patient_phone: formatMozPhone(formData.phone),
+          weight: 0,
+          height: 0,
+          bmi: 0,
+          blood_pressure: "0/0",
+          systolic: 0,
+          diastolic: 0,
+          glucose: 0,
+          ai_analysis: `SOLICITAÇÃO DE CONSULTA\n\nMotivo: ${formData.reason}\n\nStatus: Aguardando triagem biométrica pelo profissional.`,
+          campaign_id: null // Or fetch a default campaign
+        }]);
+        
+      if (consError) throw consError;
+      
+      navigate(`/patient?id=${consultationId}`);
+    } catch (err) {
+      console.error(err);
+      alert("Erro ao solicitar consulta.");
+    } finally {
+      setRequesting(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-slate-50">
         <div className="w-8 h-8 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  if (!consultation && !id) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col">
+        <header className="bg-white border-b border-slate-200 px-4 py-6">
+          <div className="max-w-2xl mx-auto flex items-center gap-3">
+            <div className="w-10 h-10 bg-cyan-600 rounded-xl flex items-center justify-center text-white">
+              <Activity className="w-6 h-6" />
+            </div>
+            <h1 className="font-bold text-slate-900">Al-Shifa Health</h1>
+          </div>
+        </header>
+
+        <main className="max-w-md mx-auto w-full p-4 py-10 space-y-8">
+          <div className="text-center space-y-2">
+            <h2 className="text-2xl font-black text-slate-900">Solicitar Consulta</h2>
+            <p className="text-slate-500">Preencha os seus dados para ser encaminhado a um médico disponível.</p>
+          </div>
+
+          <form onSubmit={handleRequest} className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-4">
+            <div>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 ml-1">Nome Completo</label>
+              <div className="relative">
+                <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input
+                  type="text"
+                  required
+                  placeholder="Seu nome"
+                  className="w-full pl-11 pr-4 py-3 rounded-2xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-cyan-500 outline-none transition-all text-sm"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 ml-1">Idade</label>
+                <input
+                  type="number"
+                  required
+                  placeholder="Ex: 25"
+                  className="w-full px-4 py-3 rounded-2xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-cyan-500 outline-none transition-all text-sm"
+                  value={formData.age}
+                  onChange={(e) => setFormData({ ...formData, age: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 ml-1">Telemóvel</label>
+                <div className="relative">
+                  <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    type="tel"
+                    required
+                    placeholder="840000000"
+                    className="w-full pl-11 pr-4 py-3 rounded-2xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-cyan-500 outline-none transition-all text-sm"
+                    value={formData.phone}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 ml-1">Motivo da Consulta</label>
+              <textarea
+                required
+                placeholder="Descreva brevemente o que sente..."
+                className="w-full px-4 py-3 rounded-2xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-cyan-500 outline-none transition-all text-sm h-24 resize-none"
+                value={formData.reason}
+                onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={requesting}
+              className="w-full bg-slate-900 text-white font-bold py-4 rounded-2xl shadow-lg flex items-center justify-center gap-2 active:scale-[0.98] transition-all disabled:opacity-50"
+            >
+              {requesting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+              Enviar Solicitação
+            </button>
+          </form>
+
+          <div className="flex items-center justify-center gap-2 text-emerald-600 bg-emerald-50 py-3 rounded-2xl">
+            <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+            <span className="text-xs font-bold uppercase tracking-wider">Médicos Online Agora</span>
+          </div>
+        </main>
       </div>
     );
   }
@@ -112,7 +276,10 @@ export default function PatientPortal() {
               </div>
               <div>
                 <p className="text-[10px] text-slate-400 uppercase font-bold">Profissional</p>
-                <p className="text-sm font-bold text-slate-700">{consultation.professional_name}</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-bold text-slate-700">{consultation.professional_name}</p>
+                  {consultation.profiles?.is_verified && <VerifiedBadge size="sm" />}
+                </div>
               </div>
             </div>
           </div>

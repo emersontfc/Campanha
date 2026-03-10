@@ -148,6 +148,12 @@ export default function LoginPage() {
               </div>
             )}
 
+            {!isLogin && (
+              <p className="text-[10px] text-slate-400 font-medium px-1">
+                * A sua conta será analisada e verificada manualmente por um administrador para garantir a segurança da plataforma.
+              </p>
+            )}
+
             <button
               type="submit"
               disabled={loading}
