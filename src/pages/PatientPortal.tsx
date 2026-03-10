@@ -28,18 +28,33 @@ export default function PatientPortal() {
     }
 
     const fetchData = async () => {
-      const { data, error } = await supabase
-        .from('consultations')
-        .select('*, profiles:professional_id(is_verified)')
-        .eq('consultation_id', id)
-        .single();
+      try {
+        const { data: consultationData, error: consultationError } = await supabase
+          .from('consultations')
+          .select('*')
+          .eq('consultation_id', id)
+          .single();
+          
+        if (consultationError) throw consultationError;
         
-      if (error) {
+        if (consultationData && consultationData.professional_id) {
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('is_verified')
+            .eq('id', consultationData.professional_id)
+            .single();
+            
+          if (profileData) {
+            consultationData.profiles = profileData;
+          }
+        }
+        
+        setConsultation(consultationData);
+      } catch (error) {
         console.error(error);
-      } else {
-        setConsultation(data);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
 
     fetchData();

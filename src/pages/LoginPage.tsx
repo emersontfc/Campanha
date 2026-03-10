@@ -118,8 +118,10 @@ export default function LoginPage() {
             )}
 
             <div className="space-y-1.5 sm:space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Email Profissional</label>
+              <label htmlFor="email" className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Email Profissional</label>
               <input
+                id="email"
+                name="email"
                 type="email"
                 required
                 autoComplete="email"
@@ -131,8 +133,10 @@ export default function LoginPage() {
             </div>
 
             <div className="space-y-1.5 sm:space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Senha</label>
+              <label htmlFor="password" className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Senha</label>
               <input
+                id="password"
+                name="password"
                 type="password"
                 required
                 autoComplete={isLogin ? "current-password" : "new-password"}

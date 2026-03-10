@@ -74,7 +74,7 @@ export default function NewConsultation() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
-    if (!formData.campaignId) {
+    if (campaigns.length > 0 && !formData.campaignId) {
       alert("Por favor selecione uma campanha.");
       return;
     }
@@ -83,28 +83,31 @@ export default function NewConsultation() {
     const consultationId = generateConsultationId();
     
     try {
+      const insertData: any = {
+        consultation_id: consultationId,
+        professional_id: user.id,
+        professional_name: profile?.name,
+        patient_name: formData.patientName,
+        patient_age: Number(formData.patientAge),
+        patient_phone: formatMozPhone(formData.patientPhone),
+        weight: Number(formData.weight),
+        height: Number(formData.height),
+        bmi: Number(bmi.toFixed(1)),
+        blood_pressure: `${formData.systolic}/${formData.diastolic}`,
+        systolic: Number(formData.systolic),
+        diastolic: Number(formData.diastolic),
+        glucose: Number(formData.glucose),
+        ai_analysis: aiAnalysis,
+        status: 'completed',
+      };
+      
+      if (formData.campaignId) {
+        insertData.campaign_id = formData.campaignId;
+      }
+
       const { error } = await supabase
         .from('consultations')
-        .insert([
-          {
-            consultation_id: consultationId,
-            professional_id: user.id,
-            campaign_id: formData.campaignId,
-            professional_name: profile?.name,
-            patient_name: formData.patientName,
-            patient_age: Number(formData.patientAge),
-            patient_phone: formatMozPhone(formData.patientPhone),
-            weight: Number(formData.weight),
-            height: Number(formData.height),
-            bmi: Number(bmi.toFixed(1)),
-            blood_pressure: `${formData.systolic}/${formData.diastolic}`,
-            systolic: Number(formData.systolic),
-            diastolic: Number(formData.diastolic),
-            glucose: Number(formData.glucose),
-            ai_analysis: aiAnalysis,
-            status: 'completed',
-          }
-        ]);
+        .insert([insertData]);
         
       if (error) {
         console.error("Supabase Insert Error:", error);
@@ -141,17 +144,23 @@ export default function NewConsultation() {
             
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Campanha Ativa</label>
-              <select
-                required
-                className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-cyan-500 outline-none bg-white"
-                value={formData.campaignId}
-                onChange={(e) => setFormData({ ...formData, campaignId: e.target.value })}
-              >
-                <option value="">Selecionar Campanha...</option>
-                {campaigns.map(c => (
-                  <option key={c.id} value={c.id}>{c.name} ({c.location})</option>
-                ))}
-              </select>
+              {campaigns.length === 0 ? (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-700 text-sm font-medium">
+                  Nenhuma campanha ativa encontrada. Por favor, contacte o administrador para criar uma campanha antes de registar consultas.
+                </div>
+              ) : (
+                <select
+                  required
+                  className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-cyan-500 outline-none bg-white"
+                  value={formData.campaignId}
+                  onChange={(e) => setFormData({ ...formData, campaignId: e.target.value })}
+                >
+                  <option value="">Selecionar Campanha...</option>
+                  {campaigns.map(c => (
+                    <option key={c.id} value={c.id}>{c.name} ({c.location})</option>
+                  ))}
+                </select>
+              )}
             </div>
 
             <div>

@@ -368,6 +368,16 @@ export default function AdminDashboard() {
         <main className="flex-1 overflow-y-auto p-4 sm:p-8">
           <div className="max-w-7xl mx-auto space-y-8">
             
+            {errorMsg && (
+              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3 text-red-700">
+                <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+                <div>
+                  <h3 className="font-bold">Erro ao carregar dados</h3>
+                  <p className="text-sm">{errorMsg}</p>
+                </div>
+              </div>
+            )}
+
             {/* OVERVIEW TAB */}
             {activeTab === "overview" && (
               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
