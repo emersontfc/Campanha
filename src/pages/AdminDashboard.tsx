@@ -281,7 +281,7 @@ export default function AdminDashboard() {
     setActiveDropdown(null);
   };
 
-  const handleDeleteConsultation = async (e: React.MouseEvent, consultationId: string) => {
+  const handleDeleteConsultation = async (e: React.MouseEvent, id: string) => {
     e.preventDefault();
     e.stopPropagation();
     
@@ -290,10 +290,10 @@ export default function AdminDashboard() {
       const { error } = await supabase
         .from('consultations')
         .delete()
-        .eq('consultation_id', consultationId);
+        .eq('id', id);
         
       if (error) throw error;
-      setConsultations(consultations.filter(c => c.consultation_id !== consultationId));
+      setConsultations(consultations.filter(c => c.id !== id));
       fetchData(); // Refresh stats
       alert("Consulta eliminada com sucesso.");
     } catch (err: any) {
@@ -865,7 +865,7 @@ export default function AdminDashboard() {
                             </td>
                             <td className="px-6 py-4 text-right">
                               <button
-                                onClick={(e) => handleDeleteConsultation(e, c.consultation_id)}
+                                onClick={(e) => handleDeleteConsultation(e, c.id)}
                                 className="p-2 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors"
                                 title="Eliminar consulta"
                               >

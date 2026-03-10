@@ -101,12 +101,17 @@ export default function PatientPortal() {
       // Create consultation request in general pool
       const consultationId = generateConsultationId();
       
-      // Get an active campaign if any exists to avoid NOT NULL constraints
-      const { data: activeCampaigns } = await supabase
+      // Get ANY campaign to satisfy NOT NULL constraints
+      // Try active first, then any, then fail gracefully
+      const { data: allCampaigns } = await supabase
         .from('campaigns')
         .select('id')
-        .eq('active', true)
+        .order('active', { ascending: false })
         .limit(1);
+
+      if (!allCampaigns || allCampaigns.length === 0) {
+        throw new Error("Não existem campanhas configuradas. O administrador deve criar uma campanha primeiro.");
+      }
 
       const insertData: any = {
         consultation_id: consultationId,
@@ -120,17 +125,14 @@ export default function PatientPortal() {
         systolic: 0,
         diastolic: 0,
         glucose: 0,
-        patient_sex: 'M', // Default
+        patient_sex: 'M',
         is_smoker: false,
         is_on_hypertension_treatment: false,
         cvd_risk_score: 0,
         ai_analysis: `SOLICITAÇÃO DE CONSULTA\n\nMotivo: ${formData.reason}`,
-        status: 'pending'
+        status: 'pending',
+        campaign_id: allCampaigns[0].id
       };
-
-      if (activeCampaigns && activeCampaigns.length > 0) {
-        insertData.campaign_id = activeCampaigns[0].id;
-      }
 
       const { error: consError } = await supabase
         .from('consultations')
@@ -138,10 +140,12 @@ export default function PatientPortal() {
         
       if (consError) throw consError;
       
+      // Force a small delay to ensure DB consistency before navigation
+      await new Promise(resolve => setTimeout(resolve, 500));
       navigate(`/patient?id=${consultationId}`);
     } catch (err: any) {
       console.error("Request Error:", err);
-      alert(`Erro ao solicitar consulta: ${err.message || "Erro de conexão"}`);
+      alert(`Erro ao solicitar consulta: ${err.message || "Erro de conexão com o servidor"}`);
     } finally {
       setRequesting(false);
     }
