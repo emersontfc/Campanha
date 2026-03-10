@@ -125,7 +125,7 @@ export default function Dashboard() {
     }
   };
 
-  const handleDeleteConsultation = async (e: React.MouseEvent, consultationId: string) => {
+  const handleDeleteConsultation = async (e: React.MouseEvent, id: string) => {
     e.preventDefault();
     e.stopPropagation();
     
@@ -133,16 +133,16 @@ export default function Dashboard() {
       return;
     }
 
-    setDeletingId(consultationId);
+    setDeletingId(id);
     try {
       const { error } = await supabase
         .from('consultations')
         .delete()
-        .eq('consultation_id', consultationId);
+        .eq('id', id);
         
       if (error) throw error;
       
-      setRecentConsultations(prev => prev.filter(c => c.consultation_id !== consultationId));
+      setRecentConsultations(prev => prev.filter(c => c.id !== id));
       setStats(prev => ({ ...prev, total: prev.total - 1 }));
     } catch (error) {
       console.error("Error deleting consultation:", error);
@@ -338,12 +338,12 @@ export default function Dashboard() {
                       </span>
                     </div>
                     <button
-                      onClick={(e) => handleDeleteConsultation(e, c.consultation_id)}
-                      disabled={deletingId === c.consultation_id}
+                      onClick={(e) => handleDeleteConsultation(e, c.id)}
+                      disabled={deletingId === c.id}
                       className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                       title="Eliminar Consulta"
                     >
-                      {deletingId === c.consultation_id ? (
+                      {deletingId === c.id ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
                       ) : (
                         <Trash2 className="w-4 h-4" />
