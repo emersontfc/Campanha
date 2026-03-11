@@ -67,7 +67,10 @@ export default function AdminDashboard() {
 
       // Fetch Users from the server API to include Auth users without profiles
       const userResponse = await fetch("/api/admin?action=list-users");
-      if (!userResponse.ok) throw new Error("Erro ao carregar utilizadores do servidor");
+      if (!userResponse.ok) {
+        const errorData = await userResponse.json().catch(() => ({}));
+        throw new Error(errorData.error || "Erro ao carregar utilizadores do servidor");
+      }
       const userData = await userResponse.json();
       setUsers(userData || []);
 

@@ -31,12 +31,23 @@ async function startServer() {
     const email = req.body.email;
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
+    console.log(`[Admin API] Action: ${action}, Method: ${req.method}`);
+
     try {
       if (action === 'list-users' || req.method === 'GET') {
+        console.log("[Admin API] Fetching users from Auth...");
         const { data: { users: authUsers }, error: authError } = await supabaseAdmin.auth.admin.listUsers();
-        if (authError) throw authError;
+        if (authError) {
+          console.error("[Admin API] Auth Error:", authError);
+          throw authError;
+        }
+        
+        console.log(`[Admin API] Found ${authUsers?.length} auth users. Fetching profiles...`);
         const { data: profiles, error: profileError } = await supabaseAdmin.from('profiles').select('*');
-        if (profileError) throw profileError;
+        if (profileError) {
+          console.error("[Admin API] Profile Error:", profileError);
+          throw profileError;
+        }
 
         const mergedUsers = authUsers.map(authUser => {
           const profile = profiles?.find(p => p.id === authUser.id);
@@ -51,6 +62,8 @@ async function startServer() {
             has_profile: !!profile
           };
         });
+        
+        console.log(`[Admin API] Successfully merged ${mergedUsers.length} users.`);
         return res.json(mergedUsers);
       }
 
