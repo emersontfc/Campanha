@@ -19,42 +19,72 @@ async function startServer() {
   const supabaseUrl = process.env.VITE_SUPABASE_URL!;
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  // API to generate reset link
-  app.post("/api/generate-reset-link", async (req, res) => {
+  // Consolidado Admin API (Compatível com Vercel)
+  app.all("/api/admin", async (req, res) => {
     if (!supabaseServiceKey) {
       return res.status(500).json({ 
-        error: "SUPABASE_SERVICE_ROLE_KEY não está configurada no servidor. Por favor, adicione-a nos Secrets." 
+        error: "SUPABASE_SERVICE_ROLE_KEY não configurada." 
       });
     }
 
-    const { email } = req.body;
-    if (!email) return res.status(400).json({ error: "Email é obrigatório" });
-
-    // Initialize Supabase Admin client
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false
-      }
-    });
+    const action = req.query.action || req.body.action;
+    const email = req.body.email;
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
     try {
-      // Generate recovery link
-      // This does NOT send an email
-      const { data, error } = await supabaseAdmin.auth.admin.generateLink({
-        type: 'recovery',
-        email: email,
-        options: {
-          redirectTo: `${req.headers.origin}/#/reset-password`
-        }
-      });
+      if (action === 'list-users' || req.method === 'GET') {
+        const { data: { users: authUsers }, error: authError } = await supabaseAdmin.auth.admin.listUsers();
+        if (authError) throw authError;
+        const { data: profiles, error: profileError } = await supabaseAdmin.from('profiles').select('*');
+        if (profileError) throw profileError;
 
-      if (error) throw error;
+        const mergedUsers = authUsers.map(authUser => {
+          const profile = profiles?.find(p => p.id === authUser.id);
+          return {
+            id: authUser.id,
+            email: authUser.email,
+            name: profile?.name || authUser.user_metadata?.name || authUser.user_metadata?.full_name || 'Sem Nome',
+            role: profile?.role || authUser.user_metadata?.role || 'MedicalProfessional',
+            specialty: profile?.specialty || authUser.user_metadata?.specialty || '',
+            is_verified: profile?.is_verified ?? false,
+            created_at: authUser.created_at,
+            has_profile: !!profile
+          };
+        });
+        return res.json(mergedUsers);
+      }
 
-      // The link is in data.properties.action_link
-      res.json({ link: data.properties.action_link });
+      if (action === 'create-user') {
+        const { email, password, name, role, specialty } = req.body;
+        const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+          email, password, email_confirm: true, user_metadata: { name, role, specialty }
+        });
+        if (authError) throw authError;
+
+        await supabaseAdmin.from('profiles').upsert({
+          id: authData.user.id, name, email,
+          role: role === "Administrador" ? "Admin" : "MedicalProfessional",
+          specialty, is_verified: true
+        });
+        return res.json({ success: true, user: authData.user });
+      }
+
+      if (action === 'sync-profile') {
+        const { id, email, name, role, specialty } = req.body;
+        await supabaseAdmin.from('profiles').upsert({ id, name, email, role, specialty, is_verified: true });
+        return res.json({ success: true });
+      }
+
+      if (action === 'generate-link' || (!action && email)) {
+        const { data, error } = await supabaseAdmin.auth.admin.generateLink({
+          type: 'recovery', email, options: { redirectTo: `${req.headers.origin}/#/reset-password` }
+        });
+        if (error) throw error;
+        return res.json({ link: data.properties.action_link });
+      }
+
+      res.status(400).json({ error: "Ação inválida" });
     } catch (err: any) {
-      console.error("Error generating link:", err);
       res.status(500).json({ error: err.message });
     }
   });

@@ -65,13 +65,10 @@ export default function AdminDashboard() {
       if (campaignError) throw new Error(`Campaigns Error: ${campaignError.message}`);
       setCampaigns(campaignData || []);
 
-      // Fetch Users
-      const { data: userData, error: userError } = await supabase
-        .from('profiles')
-        .select('*')
-        .order('created_at', { ascending: false });
-        
-      if (userError) throw new Error(`Users Error: ${userError.message}`);
+      // Fetch Users from the server API to include Auth users without profiles
+      const userResponse = await fetch("/api/admin?action=list-users");
+      if (!userResponse.ok) throw new Error("Erro ao carregar utilizadores do servidor");
+      const userData = await userResponse.json();
       setUsers(userData || []);
 
       // Fetch All Consultations
@@ -205,10 +202,10 @@ export default function AdminDashboard() {
     try {
       // If we have a phone number, we use the server API to generate a link WITHOUT sending an email
       if (phone) {
-        const response = await fetch("/api/generate-reset-link", {
+        const response = await fetch("/api/admin", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email }),
+          body: JSON.stringify({ email, action: 'generate-link' }),
         });
 
         const data = await response.json();
@@ -242,68 +239,52 @@ export default function AdminDashboard() {
 
     setIsCreatingUser(true);
     try {
-      // Use a secondary client to sign up the user without persisting the session
-      // This prevents the admin from being logged out and replaced by the new user
-      const tempSupabase = createClient(
-        import.meta.env.VITE_SUPABASE_URL,
-        import.meta.env.VITE_SUPABASE_ANON_KEY,
-        {
-          auth: {
-            persistSession: false,
-            autoRefreshToken: false,
-            detectSessionInUrl: false
-          }
-        }
-      );
-
-      // Create user in auth using the temporary client
-      const { data: authData, error: authError } = await tempSupabase.auth.signUp({
-        email: newUserForm.email,
-        password: newUserForm.password,
-        options: {
-          data: {
-            name: newUserForm.name,
-            role: newUserForm.role,
-            specialty: newUserForm.specialty,
-          }
-        }
+      const response = await fetch("/api/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...newUserForm, action: 'create-user' }),
       });
 
-      if (authError) throw authError;
-
-      // Ensure the profile exists and is verified since an admin created it
-      if (authData.user) {
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .upsert({ 
-            id: authData.user.id, 
-            name: newUserForm.name,
-            email: newUserForm.email,
-            role: newUserForm.role === "Administrador" ? "Admin" : "MedicalProfessional",
-            specialty: newUserForm.specialty,
-            is_verified: true,
-            created_at: new Date().toISOString()
-          });
-
-        if (profileError) {
-          console.error("Profile creation error:", profileError);
-        }
-      }
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Erro ao criar utilizador");
 
       setShowNewUserModal(false);
       setNewUserForm({ name: "", email: "", password: "", role: "Profissional", specialty: "" });
-      
-      // Wait a bit for Supabase triggers to complete if any
-      setTimeout(() => {
-        fetchData();
-      }, 500);
-
-      alert("Utilizador criado com sucesso! O administrador permanece logado.");
+      fetchData();
+      alert("Utilizador criado com sucesso!");
     } catch (err: any) {
       console.error("Error creating user:", err);
       alert(`Erro ao criar utilizador: ${err.message}`);
     } finally {
       setIsCreatingUser(false);
+    }
+  };
+
+  const handleSyncProfile = async (u: any) => {
+    try {
+      const response = await fetch("/api/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: u.id,
+          email: u.email,
+          name: u.name,
+          role: u.role,
+          specialty: u.specialty,
+          action: 'sync-profile'
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Erro ao sincronizar perfil");
+      }
+
+      fetchData();
+      alert("Perfil sincronizado com sucesso!");
+    } catch (err: any) {
+      console.error("Error syncing profile:", err);
+      alert(`Erro ao sincronizar: ${err.message}`);
     }
   };
 
@@ -703,6 +684,11 @@ export default function AdminDashboard() {
                                   <div className="font-medium text-slate-900 flex items-center gap-1">
                                     {u.name}
                                     {u.is_verified && <VerifiedBadge size="sm" />}
+                                    {!u.has_profile && (
+                                      <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-md font-bold uppercase tracking-tighter">
+                                        Fora do Banco
+                                      </span>
+                                    )}
                                   </div>
                                   <div className="text-xs text-slate-500">{u.email}</div>
                                 </div>
@@ -755,6 +741,14 @@ export default function AdminDashboard() {
                                         >
                                           <Edit2 className="w-4 h-4" /> Editar Perfil
                                         </button>
+                                        {!u.has_profile && (
+                                          <button
+                                            onClick={() => handleSyncProfile(u)}
+                                            className="w-full flex items-center gap-2 px-4 py-2 text-sm text-sky-600 font-bold hover:bg-sky-50"
+                                          >
+                                            <RefreshCw className="w-4 h-4" /> Sincronizar Banco
+                                          </button>
+                                        )}
                                         <button
                                           onClick={() => handleSendPasswordReset(u.email, prompt("Digite o número de WhatsApp do utilizador (opcional, com código do país):"))}
                                           className="w-full flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
