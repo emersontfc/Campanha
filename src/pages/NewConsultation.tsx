@@ -150,62 +150,77 @@ export default function NewConsultation() {
     }
 
     const saveConsultation = async (attempts = 0): Promise<string> => {
-      const consultationId = generateConsultationId();
-      
-      // Determine final BP values (highest arm if bilateral)
-      let finalSystolic = Number(formData.systolic);
-      let finalDiastolic = Number(formData.diastolic);
-      let bpNote = "";
-
-      if (formData.isBilateral) {
-        finalSystolic = Math.max(Number(formData.systolicLeft), Number(formData.systolicRight));
-        finalDiastolic = Number(formData.systolicRight) >= Number(formData.systolicLeft) 
-          ? Number(formData.diastolicRight) 
-          : Number(formData.diastolicLeft);
+      try {
+        const consultationId = generateConsultationId();
         
-        bpNote = `\n\n[AVALIAÇÃO BILATERAL AHA]\nBraço Direito: ${formData.systolicRight}/${formData.diastolicRight} mmHg\nBraço Esquerdo: ${formData.systolicLeft}/${formData.diastolicLeft} mmHg\nDiferença: ${Math.abs(Number(formData.systolicRight) - Number(formData.systolicLeft))} mmHg`;
-      }
+        // Determine final BP values (highest arm if bilateral)
+        let finalSystolic = Number(formData.systolic);
+        let finalDiastolic = Number(formData.diastolic);
+        let bpNote = "";
 
-      const insertData: any = {
-        consultation_id: consultationId,
-        professional_id: user.id,
-        professional_name: profName || "Profissional",
-        patient_name: formData.patientName,
-        patient_age: Number(formData.patientAge),
-        patient_phone: formatMozPhone(formData.patientPhone),
-        weight: Number(formData.weight),
-        height: Number(formData.height),
-        bmi: Number(bmi.toFixed(1)),
-        blood_pressure: `${finalSystolic}/${finalDiastolic}`,
-        systolic: finalSystolic,
-        diastolic: finalDiastolic,
-        glucose: Number(formData.glucose),
-        patient_sex: formData.patientSex,
-        is_smoker: formData.isSmoker,
-        is_on_hypertension_treatment: formData.isTreated,
-        cvd_risk_score: cvdRisk,
-        physical_examination: (formData.physicalExamination || "") + bpNote,
-        ai_analysis: aiAnalysis,
-        status: 'completed',
-      };
-      
-      if (formData.campaignId) {
-        insertData.campaign_id = formData.campaignId;
-      }
+        if (formData.isBilateral) {
+          finalSystolic = Math.max(Number(formData.systolicLeft), Number(formData.systolicRight));
+          finalDiastolic = Number(formData.systolicRight) >= Number(formData.systolicLeft) 
+            ? Number(formData.diastolicRight) 
+            : Number(formData.diastolicLeft);
+          
+          bpNote = `\n\n[AVALIAÇÃO BILATERAL AHA]\nBraço Direito: ${formData.systolicRight}/${formData.diastolicRight} mmHg\nBraço Esquerdo: ${formData.systolicLeft}/${formData.diastolicLeft} mmHg\nDiferença: ${Math.abs(Number(formData.systolicRight) - Number(formData.systolicLeft))} mmHg`;
+        }
 
-      const { error } = await supabase
-        .from('consultations')
-        .insert([insertData]);
+        const insertData: any = {
+          consultation_id: consultationId,
+          professional_id: user.id,
+          professional_name: profName || "Profissional",
+          patient_name: formData.patientName,
+          patient_age: Number(formData.patientAge),
+          patient_phone: formatMozPhone(formData.patientPhone),
+          weight: Number(formData.weight),
+          height: Number(formData.height),
+          bmi: Number(bmi.toFixed(1)),
+          blood_pressure: `${finalSystolic}/${finalDiastolic}`,
+          systolic: finalSystolic,
+          diastolic: finalDiastolic,
+          glucose: Number(formData.glucose),
+          patient_sex: formData.patientSex,
+          is_smoker: formData.isSmoker,
+          is_on_hypertension_treatment: formData.isTreated,
+          cvd_risk_score: cvdRisk,
+          physical_examination: (formData.physicalExamination || "") + bpNote,
+          ai_analysis: aiAnalysis,
+          status: 'completed',
+        };
         
-      if (error) {
-        // If it's a duplicate key error and we have attempts left, try again with a new ID
-        if (error.code === '23505' && attempts < 3) {
+        if (formData.campaignId) {
+          insertData.campaign_id = formData.campaignId;
+        }
+
+        const { error } = await supabase
+          .from('consultations')
+          .insert([insertData]);
+          
+        if (error) {
+          // If it's a duplicate key error and we have attempts left, try again with a new ID
+          if (error.code === '23505' && attempts < 3) {
+            return saveConsultation(attempts + 1);
+          }
+          throw error;
+        }
+        
+        return consultationId;
+      } catch (err: any) {
+        // Handle network errors like "Load failed" or "Failed to fetch"
+        const isNetworkError = err.message?.includes('Load failed') || 
+                               err.message?.includes('Failed to fetch') ||
+                               err.name === 'TypeError';
+        
+        if (isNetworkError && attempts < 3) {
+          console.warn(`Network error detected (attempt ${attempts + 1}), retrying...`, err);
+          // Wait a bit before retrying
+          await new Promise(resolve => setTimeout(resolve, 1000 * (attempts + 1)));
           return saveConsultation(attempts + 1);
         }
-        throw error;
+        throw err;
       }
-      
-      return consultationId;
     };
 
     try {

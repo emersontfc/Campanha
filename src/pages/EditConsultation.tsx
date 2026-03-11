@@ -181,39 +181,56 @@ export default function EditConsultation() {
       bpNote = `\n\n[AVALIAÇÃO BILATERAL AHA]\nBraço Direito: ${formData.systolicRight}/${formData.diastolicRight} mmHg\nBraço Esquerdo: ${formData.systolicLeft}/${formData.diastolicLeft} mmHg\nDiferença: ${Math.abs(Number(formData.systolicRight) - Number(formData.systolicLeft))} mmHg`;
     }
 
-    try {
-      const updateData: any = {
-        patient_name: formData.patientName,
-        patient_age: Number(formData.patientAge),
-        weight: Number(formData.weight),
-        height: Number(formData.height),
-        bmi: Number(bmi.toFixed(1)),
-        blood_pressure: `${finalSystolic}/${finalDiastolic}`,
-        systolic: finalSystolic,
-        diastolic: finalDiastolic,
-        glucose: Number(formData.glucose),
-        patient_sex: formData.patientSex,
-        is_smoker: formData.isSmoker,
-        is_on_hypertension_treatment: formData.isTreated,
-        cvd_risk_score: cvdRisk,
-        physical_examination: (formData.physicalExamination || "") + bpNote,
-        ai_analysis: aiAnalysis,
-        status: 'completed',
-      };
-      
-      if (formData.campaignId) {
-        updateData.campaign_id = formData.campaignId;
-      }
-
-      const { error } = await supabase
-        .from('consultations')
-        .update(updateData)
-        .eq('consultation_id', id);
+    const updateConsultation = async (attempts = 0): Promise<void> => {
+      try {
+        const updateData: any = {
+          patient_name: formData.patientName,
+          patient_age: Number(formData.patientAge),
+          weight: Number(formData.weight),
+          height: Number(formData.height),
+          bmi: Number(bmi.toFixed(1)),
+          blood_pressure: `${finalSystolic}/${finalDiastolic}`,
+          systolic: finalSystolic,
+          diastolic: finalDiastolic,
+          glucose: Number(formData.glucose),
+          patient_sex: formData.patientSex,
+          is_smoker: formData.isSmoker,
+          is_on_hypertension_treatment: formData.isTreated,
+          cvd_risk_score: cvdRisk,
+          physical_examination: (formData.physicalExamination || "") + bpNote,
+          ai_analysis: aiAnalysis,
+          status: 'completed',
+        };
         
-      if (error) {
-        console.error("Supabase Update Error:", error);
-        throw error;
+        if (formData.campaignId) {
+          updateData.campaign_id = formData.campaignId;
+        }
+
+        const { error } = await supabase
+          .from('consultations')
+          .update(updateData)
+          .eq('consultation_id', id);
+          
+        if (error) {
+          console.error("Supabase Update Error:", error);
+          throw error;
+        }
+      } catch (err: any) {
+        const isNetworkError = err.message?.includes('Load failed') || 
+                               err.message?.includes('Failed to fetch') ||
+                               err.name === 'TypeError';
+        
+        if (isNetworkError && attempts < 3) {
+          console.warn(`Network error detected (attempt ${attempts + 1}), retrying...`, err);
+          await new Promise(resolve => setTimeout(resolve, 1000 * (attempts + 1)));
+          return updateConsultation(attempts + 1);
+        }
+        throw err;
       }
+    };
+
+    try {
+      await updateConsultation();
       navigate(`/patient?id=${id}`);
     } catch (err: any) {
       console.error("Finalize Error:", err);
