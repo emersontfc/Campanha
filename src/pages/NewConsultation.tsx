@@ -141,28 +141,35 @@ export default function NewConsultation() {
     }
     
     setLoading(true);
-    const consultationId = generateConsultationId();
     
-    // Determine final BP values (highest arm if bilateral)
-    let finalSystolic = Number(formData.systolic);
-    let finalDiastolic = Number(formData.diastolic);
-    let bpNote = "";
-
-    if (formData.isBilateral) {
-      finalSystolic = Math.max(Number(formData.systolicLeft), Number(formData.systolicRight));
-      // Use diastolic from the same arm as highest systolic, or just max diastolic
-      finalDiastolic = Number(formData.systolicRight) >= Number(formData.systolicLeft) 
-        ? Number(formData.diastolicRight) 
-        : Number(formData.diastolicLeft);
-      
-      bpNote = `\n\n[AVALIAÇÃO BILATERAL AHA]\nBraço Direito: ${formData.systolicRight}/${formData.diastolicRight} mmHg\nBraço Esquerdo: ${formData.systolicLeft}/${formData.diastolicLeft} mmHg\nDiferença: ${Math.abs(Number(formData.systolicRight) - Number(formData.systolicLeft))} mmHg`;
+    // Ensure we have the professional name, if not try to fetch it
+    let profName = profile?.name;
+    if (!profName && user) {
+      const { data: profData } = await supabase.from('profiles').select('name').eq('id', user.id).single();
+      if (profData) profName = profData.name;
     }
 
-    try {
+    const saveConsultation = async (attempts = 0): Promise<string> => {
+      const consultationId = generateConsultationId();
+      
+      // Determine final BP values (highest arm if bilateral)
+      let finalSystolic = Number(formData.systolic);
+      let finalDiastolic = Number(formData.diastolic);
+      let bpNote = "";
+
+      if (formData.isBilateral) {
+        finalSystolic = Math.max(Number(formData.systolicLeft), Number(formData.systolicRight));
+        finalDiastolic = Number(formData.systolicRight) >= Number(formData.systolicLeft) 
+          ? Number(formData.diastolicRight) 
+          : Number(formData.diastolicLeft);
+        
+        bpNote = `\n\n[AVALIAÇÃO BILATERAL AHA]\nBraço Direito: ${formData.systolicRight}/${formData.diastolicRight} mmHg\nBraço Esquerdo: ${formData.systolicLeft}/${formData.diastolicLeft} mmHg\nDiferença: ${Math.abs(Number(formData.systolicRight) - Number(formData.systolicLeft))} mmHg`;
+      }
+
       const insertData: any = {
         consultation_id: consultationId,
         professional_id: user.id,
-        professional_name: profile?.name,
+        professional_name: profName || "Profissional",
         patient_name: formData.patientName,
         patient_age: Number(formData.patientAge),
         patient_phone: formatMozPhone(formData.patientPhone),
@@ -177,7 +184,7 @@ export default function NewConsultation() {
         is_smoker: formData.isSmoker,
         is_on_hypertension_treatment: formData.isTreated,
         cvd_risk_score: cvdRisk,
-        physical_examination: formData.physicalExamination + bpNote,
+        physical_examination: (formData.physicalExamination || "") + bpNote,
         ai_analysis: aiAnalysis,
         status: 'completed',
       };
@@ -191,11 +198,19 @@ export default function NewConsultation() {
         .insert([insertData]);
         
       if (error) {
-        console.error("Supabase Insert Error:", error);
+        // If it's a duplicate key error and we have attempts left, try again with a new ID
+        if (error.code === '23505' && attempts < 3) {
+          return saveConsultation(attempts + 1);
+        }
         throw error;
       }
       
-      navigate(`/patient?id=${consultationId}`);
+      return consultationId;
+    };
+
+    try {
+      const finalId = await saveConsultation();
+      navigate(`/patient?id=${finalId}`);
     } catch (err: any) {
       console.error("Save Error:", err);
       alert(`Erro ao salvar consulta: ${err.message || "Erro desconhecido"}`);

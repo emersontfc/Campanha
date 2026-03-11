@@ -9,7 +9,7 @@ import { ChevronLeft, Sparkles, Save, Loader2, MapPin, User, History, Activity, 
 import { Campaign } from "../types";
 
 export default function EditConsultation() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const id = searchParams.get("id");
@@ -159,6 +159,14 @@ export default function EditConsultation() {
     
     setSaving(true);
     
+    // Ensure we have the professional name if needed (though update usually doesn't change it, 
+    // it's good for consistency if we ever add logging or audit trails)
+    let profName = profile?.name;
+    if (!profName && user) {
+      const { data: profData } = await supabase.from('profiles').select('name').eq('id', user.id).single();
+      if (profData) profName = profData.name;
+    }
+
     // Determine final BP values (highest arm if bilateral)
     let finalSystolic = Number(formData.systolic);
     let finalDiastolic = Number(formData.diastolic);
@@ -188,7 +196,7 @@ export default function EditConsultation() {
         is_smoker: formData.isSmoker,
         is_on_hypertension_treatment: formData.isTreated,
         cvd_risk_score: cvdRisk,
-        physical_examination: formData.physicalExamination + bpNote,
+        physical_examination: (formData.physicalExamination || "") + bpNote,
         ai_analysis: aiAnalysis,
         status: 'completed',
       };

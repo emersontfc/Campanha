@@ -15,7 +15,8 @@ export function calculateBMI(weight: number, heightCm: number) {
 export function generateConsultationId() {
   const chars = "0123456789";
   let result = "AL";
-  for (let i = 0; i < 5; i++) {
+  // Aumentado para 7 dígitos para reduzir drasticamente a probabilidade de colisão
+  for (let i = 0; i < 7; i++) {
     result += chars.charAt(Math.floor(Math.random() * chars.length));
   }
   return result;
