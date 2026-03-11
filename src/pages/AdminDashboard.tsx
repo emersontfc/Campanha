@@ -1,12 +1,13 @@
 import * as React from "react";
 import { useState, useEffect } from "react";
+import { createClient } from '@supabase/supabase-js';
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../hooks/useAuth";
 import { 
   ShieldCheck, UserCheck, UserX, ChevronLeft, Search, 
   TrendingUp, Users, Activity, MapPin, Plus, Sparkles,
   LayoutDashboard, Settings, MoreVertical, Edit2, Key, Trash2,
-  Menu, X, Bell, FileText, CheckCircle2, AlertCircle, Clock
+  Menu, X, Bell, FileText, CheckCircle2, AlertCircle, Clock, RefreshCw
 } from "lucide-react";
 import { VerifiedBadge } from "../components/VerifiedBadge";
 import { useNavigate } from "react-router-dom";
@@ -202,23 +203,35 @@ export default function AdminDashboard() {
 
   const handleSendPasswordReset = async (email: string, phone?: string) => {
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/#/login`,
-      });
-      if (error) throw error;
-      
-      const resetMessage = `Olá! Foi solicitada a recuperação de senha para a sua conta na Al-Shifa Health. Por favor, verifique o seu email (${email}) para redefinir a sua senha.`;
-      
+      // If we have a phone number, we use the server API to generate a link WITHOUT sending an email
       if (phone) {
+        const response = await fetch("/api/generate-reset-link", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email }),
+        });
+
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Erro ao gerar link no servidor");
+
+        const resetLink = data.link;
+        const resetMessage = `Olá! Foi solicitada a redefinição de senha para a sua conta na Al-Shifa Health.\n\nClique no link abaixo para criar uma nova senha segura:\n\n${resetLink}\n\nO link é válido por 1 hora por razões de segurança.`;
+        
         const formattedPhone = phone.replace(/\D/g, "");
-        const url = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(resetMessage)}`;
+        const finalPhone = formattedPhone.startsWith('8') ? `258${formattedPhone}` : formattedPhone;
+        const url = `https://wa.me/${finalPhone}?text=${encodeURIComponent(resetMessage)}`;
         window.open(url, "_blank");
       } else {
-        alert(`Link de recuperação enviado para ${email}`);
+        // Fallback to standard email reset if no phone is provided
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${window.location.origin}/#/reset-password`,
+        });
+        if (error) throw error;
+        alert(`Instruções de redefinição enviadas para o email ${email}.`);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error sending reset link:", err);
-      alert("Erro ao enviar o link de recuperação.");
+      alert(`Erro ao processar redefinição: ${err.message}`);
     }
     setActiveDropdown(null);
   };
@@ -229,8 +242,22 @@ export default function AdminDashboard() {
 
     setIsCreatingUser(true);
     try {
-      // Create user in auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
+      // Use a secondary client to sign up the user without persisting the session
+      // This prevents the admin from being logged out and replaced by the new user
+      const tempSupabase = createClient(
+        import.meta.env.VITE_SUPABASE_URL,
+        import.meta.env.VITE_SUPABASE_ANON_KEY,
+        {
+          auth: {
+            persistSession: false,
+            autoRefreshToken: false,
+            detectSessionInUrl: false
+          }
+        }
+      );
+
+      // Create user in auth using the temporary client
+      const { data: authData, error: authError } = await tempSupabase.auth.signUp({
         email: newUserForm.email,
         password: newUserForm.password,
         options: {
@@ -244,18 +271,34 @@ export default function AdminDashboard() {
 
       if (authError) throw authError;
 
-      // The profile is created automatically by the trigger, but we might want to update it to be verified immediately since an admin created it
+      // Ensure the profile exists and is verified since an admin created it
       if (authData.user) {
-        await supabase
+        const { error: profileError } = await supabase
           .from('profiles')
-          .update({ is_verified: true })
-          .eq('id', authData.user.id);
+          .upsert({ 
+            id: authData.user.id, 
+            name: newUserForm.name,
+            email: newUserForm.email,
+            role: newUserForm.role === "Administrador" ? "Admin" : "MedicalProfessional",
+            specialty: newUserForm.specialty,
+            is_verified: true,
+            created_at: new Date().toISOString()
+          });
+
+        if (profileError) {
+          console.error("Profile creation error:", profileError);
+        }
       }
 
       setShowNewUserModal(false);
       setNewUserForm({ name: "", email: "", password: "", role: "Profissional", specialty: "" });
-      fetchData();
-      alert("Utilizador criado com sucesso!");
+      
+      // Wait a bit for Supabase triggers to complete if any
+      setTimeout(() => {
+        fetchData();
+      }, 500);
+
+      alert("Utilizador criado com sucesso! O administrador permanece logado.");
     } catch (err: any) {
       console.error("Error creating user:", err);
       alert(`Erro ao criar utilizador: ${err.message}`);
@@ -608,15 +651,25 @@ export default function AdminDashboard() {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <h2 className="text-2xl font-bold text-slate-800">Profissionais de Saúde</h2>
                   <div className="flex gap-3">
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-                      <input 
-                        type="text" 
-                        placeholder="Pesquisar profissionais..."
-                        className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 w-full sm:w-64"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                      />
+                    <div className="flex gap-2">
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                        <input 
+                          type="text" 
+                          placeholder="Pesquisar profissionais..."
+                          className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 w-full sm:w-64"
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                      </div>
+                      <button 
+                        onClick={() => fetchData()}
+                        disabled={loading}
+                        className="p-2 bg-white border border-slate-200 rounded-lg text-slate-500 hover:bg-slate-50 transition-colors disabled:opacity-50"
+                        title="Atualizar lista"
+                      >
+                        <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                      </button>
                     </div>
                     <button 
                       onClick={() => setShowNewUserModal(true)}

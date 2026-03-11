@@ -10,6 +10,7 @@ import PatientPortal from "./pages/PatientPortal";
 import EditConsultation from "./pages/EditConsultation";
 import AdminDashboard from "./pages/AdminDashboard";
 import PendingVerification from "./pages/PendingVerification";
+import ResetPassword from "./pages/ResetPassword";
 import { ShieldAlert } from "lucide-react";
 
 function ConfigError() {
@@ -48,6 +49,7 @@ export default function App() {
       <Router>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route 
             path="/dashboard" 
             element={

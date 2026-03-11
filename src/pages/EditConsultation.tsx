@@ -5,7 +5,7 @@ import { supabase } from "../lib/supabase";
 import { useAuth } from "../hooks/useAuth";
 import { analyzeConsultation } from "../lib/gemini";
 import { calculateBMI, calculateFraminghamRisk } from "../lib/utils";
-import { ChevronLeft, Sparkles, Save, Loader2, MapPin, User, History, Activity } from "lucide-react";
+import { ChevronLeft, Sparkles, Save, Loader2, MapPin, User, History, Activity, AlertCircle } from "lucide-react";
 import { Campaign } from "../types";
 
 export default function EditConsultation() {
@@ -34,6 +34,11 @@ export default function EditConsultation() {
     hasDiabetes: false,
     physicalExamination: "",
     campaignId: "",
+    isBilateral: false,
+    systolicLeft: "",
+    diastolicLeft: "",
+    systolicRight: "",
+    diastolicRight: "",
   });
 
   const [aiAnalysis, setAiAnalysis] = useState("");
@@ -44,7 +49,9 @@ export default function EditConsultation() {
     Number(formData.patientAge),
     formData.patientSex,
     bmi,
-    Number(formData.systolic),
+    formData.isBilateral 
+      ? Math.max(Number(formData.systolicLeft), Number(formData.systolicRight))
+      : Number(formData.systolic),
     formData.isTreated,
     formData.isSmoker,
     formData.hasDiabetes
@@ -76,6 +83,11 @@ export default function EditConsultation() {
           hasDiabetes: c.glucose >= 7.0 || false, // Fallback if not explicitly set
           physicalExamination: c.physical_examination || "",
           campaignId: c.campaign_id || "",
+          isBilateral: false,
+          systolicLeft: "",
+          diastolicLeft: "",
+          systolicRight: "",
+          diastolicRight: "",
         });
         setAiAnalysis(c.ai_analysis);
 
@@ -146,6 +158,21 @@ export default function EditConsultation() {
     }
     
     setSaving(true);
+    
+    // Determine final BP values (highest arm if bilateral)
+    let finalSystolic = Number(formData.systolic);
+    let finalDiastolic = Number(formData.diastolic);
+    let bpNote = "";
+
+    if (formData.isBilateral) {
+      finalSystolic = Math.max(Number(formData.systolicLeft), Number(formData.systolicRight));
+      finalDiastolic = Number(formData.systolicRight) >= Number(formData.systolicLeft) 
+        ? Number(formData.diastolicRight) 
+        : Number(formData.diastolicLeft);
+      
+      bpNote = `\n\n[AVALIAÇÃO BILATERAL AHA]\nBraço Direito: ${formData.systolicRight}/${formData.diastolicRight} mmHg\nBraço Esquerdo: ${formData.systolicLeft}/${formData.diastolicLeft} mmHg\nDiferença: ${Math.abs(Number(formData.systolicRight) - Number(formData.systolicLeft))} mmHg`;
+    }
+
     try {
       const updateData: any = {
         patient_name: formData.patientName,
@@ -153,15 +180,15 @@ export default function EditConsultation() {
         weight: Number(formData.weight),
         height: Number(formData.height),
         bmi: Number(bmi.toFixed(1)),
-        blood_pressure: `${formData.systolic}/${formData.diastolic}`,
-        systolic: Number(formData.systolic),
-        diastolic: Number(formData.diastolic),
+        blood_pressure: `${finalSystolic}/${finalDiastolic}`,
+        systolic: finalSystolic,
+        diastolic: finalDiastolic,
         glucose: Number(formData.glucose),
         patient_sex: formData.patientSex,
         is_smoker: formData.isSmoker,
         is_on_hypertension_treatment: formData.isTreated,
         cvd_risk_score: cvdRisk,
-        physical_examination: formData.physicalExamination,
+        physical_examination: formData.physicalExamination + bpNote,
         ai_analysis: aiAnalysis,
         status: 'completed',
       };
@@ -365,13 +392,26 @@ export default function EditConsultation() {
           <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4">
             <div className="flex items-center justify-between mb-2">
               <h2 className="font-bold text-slate-900">Dados Biométricos</h2>
-              <div className={`px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 ${
-                cvdRisk < 10 ? 'bg-emerald-50 text-emerald-700' :
-                cvdRisk < 20 ? 'bg-amber-50 text-amber-700' :
-                'bg-rose-50 text-rose-700'
-              }`}>
-                <Activity className="w-3 h-3" />
-                Risco CVD: {cvdRisk}%
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setFormData(prev => ({ ...prev, isBilateral: !prev.isBilateral }))}
+                  className={`text-[10px] font-bold px-3 py-1 rounded-full transition-all ${
+                    formData.isBilateral 
+                      ? 'bg-cyan-600 text-white shadow-sm' 
+                      : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                  }`}
+                >
+                  Avaliação Bilateral (AHA)
+                </button>
+                <div className={`px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 ${
+                  cvdRisk < 10 ? 'bg-emerald-50 text-emerald-700' :
+                  cvdRisk < 20 ? 'bg-amber-50 text-amber-700' :
+                  'bg-rose-50 text-rose-700'
+                }`}>
+                  <Activity className="w-3 h-3" />
+                  Risco CVD: {cvdRisk}%
+                </div>
               </div>
             </div>
             
@@ -404,28 +444,93 @@ export default function EditConsultation() {
               <span className="text-xl font-bold text-cyan-600">{bmi.toFixed(1)}</span>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Sistólica (mmHg)</label>
-                <input
-                  type="number"
-                  required
-                  className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-cyan-500 outline-none"
-                  value={formData.systolic}
-                  onChange={(e) => setFormData({ ...formData, systolic: e.target.value })}
-                />
+            {!formData.isBilateral ? (
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Sistólica (mmHg)</label>
+                  <input
+                    type="number"
+                    placeholder="120"
+                    required
+                    className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-cyan-500 outline-none"
+                    value={formData.systolic}
+                    onChange={(e) => setFormData({ ...formData, systolic: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Diastólica (mmHg)</label>
+                  <input
+                    type="number"
+                    placeholder="80"
+                    required
+                    className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-cyan-500 outline-none"
+                    value={formData.diastolic}
+                    onChange={(e) => setFormData({ ...formData, diastolic: e.target.value })}
+                  />
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Diastólica (mmHg)</label>
-                <input
-                  type="number"
-                  required
-                  className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-cyan-500 outline-none"
-                  value={formData.diastolic}
-                  onChange={(e) => setFormData({ ...formData, diastolic: e.target.value })}
-                />
+            ) : (
+              <div className="space-y-4 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Braço Direito</p>
+                    <div className="flex gap-2">
+                      <input
+                        type="number"
+                        placeholder="Sist"
+                        required
+                        className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-cyan-500 outline-none text-sm"
+                        value={formData.systolicRight}
+                        onChange={(e) => setFormData({ ...formData, systolicRight: e.target.value })}
+                      />
+                      <input
+                        type="number"
+                        placeholder="Diast"
+                        required
+                        className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-cyan-500 outline-none text-sm"
+                        value={formData.diastolicRight}
+                        onChange={(e) => setFormData({ ...formData, diastolicRight: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Braço Esquerdo</p>
+                    <div className="flex gap-2">
+                      <input
+                        type="number"
+                        placeholder="Sist"
+                        required
+                        className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-cyan-500 outline-none text-sm"
+                        value={formData.systolicLeft}
+                        onChange={(e) => setFormData({ ...formData, systolicLeft: e.target.value })}
+                      />
+                      <input
+                        type="number"
+                        placeholder="Diast"
+                        required
+                        className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-cyan-500 outline-none text-sm"
+                        value={formData.diastolicLeft}
+                        onChange={(e) => setFormData({ ...formData, diastolicLeft: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                </div>
+                
+                {formData.systolicRight && formData.systolicLeft && Math.abs(Number(formData.systolicRight) - Number(formData.systolicLeft)) > 10 && (
+                  <div className="p-3 bg-rose-50 border border-rose-100 rounded-xl flex items-start gap-2 text-rose-700">
+                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                    <p className="text-[10px] font-bold leading-tight">
+                      ALERTA CLÍNICO: Diferença interbraquial significativa ({Math.abs(Number(formData.systolicRight) - Number(formData.systolicLeft))} mmHg). 
+                      Considere risco cardiovascular aumentado ou estenose arterial.
+                    </p>
+                  </div>
+                )}
+                
+                <p className="text-[9px] text-slate-400 italic text-center">
+                  * O sistema utilizará automaticamente os valores mais elevados para o cálculo de risco.
+                </p>
               </div>
-            </div>
+            )}
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Glicemia (mmol/L)</label>
