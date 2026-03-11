@@ -16,14 +16,8 @@ export default async function handler(req: any, res: any) {
     });
   }
 
-  const { email } = req.body;
-
-  // Handle different endpoints based on a query param or body field if needed, 
-  // but Vercel usually prefers separate files. However, to keep it simple for the user,
-  // I will use a simple routing logic inside this handler based on a 'action' field or similar.
-  // Actually, I'll just check the path or a custom header.
-  
-  const action = req.query.action || req.body.action;
+  const action = req.query.action || (req.body ? req.body.action : null);
+  const email = req.body ? req.body.email : null;
 
   const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
     auth: {
