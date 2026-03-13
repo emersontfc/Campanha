@@ -7,7 +7,8 @@ import {
   ShieldCheck, UserCheck, UserX, ChevronLeft, Search, 
   TrendingUp, Users, Activity, MapPin, Plus, Sparkles,
   LayoutDashboard, Settings, MoreVertical, Edit2, Key, Trash2,
-  Menu, X, Bell, FileText, CheckCircle2, AlertCircle, Clock, RefreshCw
+  Menu, X, Bell, FileText, CheckCircle2, AlertCircle, Clock, RefreshCw,
+  BookOpen
 } from "lucide-react";
 import { VerifiedBadge } from "../components/VerifiedBadge";
 import { useNavigate } from "react-router-dom";
@@ -22,10 +23,11 @@ const COLORS = ['#0ea5e9', '#38bdf8', '#7dd3fc', '#bae6fd', '#e0f2fe'];
 
 export default function AdminDashboard() {
   const { profile } = useAuth();
-  const [activeTab, setActiveTab] = useState<"overview" | "campaigns" | "users" | "consultations">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "campaigns" | "users" | "consultations" | "knowledge">("overview");
   const [users, setUsers] = useState<any[]>([]);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [consultations, setConsultations] = useState<any[]>([]);
+  const [knowledgeBase, setKnowledgeBase] = useState<any[]>([]);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -35,6 +37,7 @@ export default function AdminDashboard() {
   const [showNewCampaignModal, setShowNewCampaignModal] = useState(false);
   const [newCampaign, setNewCampaign] = useState({ name: "", location: "" });
   const [isCreatingCampaign, setIsCreatingCampaign] = useState(false);
+  const [isUploadingKB, setIsUploadingKB] = useState(false);
 
   // User Management State
   const [editingUser, setEditingUser] = useState<any | null>(null);
@@ -89,6 +92,14 @@ export default function AdminDashboard() {
       }));
       
       setConsultations(consultationsWithCampaigns);
+
+      // Fetch Knowledge Base
+      const { data: kbData, error: kbError } = await supabase
+        .from('knowledge_base')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (!kbError) setKnowledgeBase(kbData || []);
 
       // Calculate Stats
       if (consultationData) {
@@ -374,6 +385,88 @@ export default function AdminDashboard() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    link.remove();
+  };
+
+  const handleUploadKB = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.type !== 'application/pdf') {
+      alert("Por favor, carregue apenas ficheiros PDF.");
+      return;
+    }
+
+    setIsUploadingKB(true);
+    try {
+      const fileName = `${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
+      const filePath = `knowledge-base/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('knowledge-base')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('knowledge-base')
+        .getPublicUrl(filePath);
+
+      const { error: dbError } = await supabase
+        .from('knowledge_base')
+        .insert([{
+          name: file.name,
+          file_path: filePath,
+          file_url: publicUrl
+        }]);
+
+      if (dbError) {
+        // Cleanup storage if DB insert fails
+        await supabase.storage.from('knowledge-base').remove([filePath]);
+        throw dbError;
+      }
+
+      // Refresh list
+      const { data: kbData } = await supabase
+        .from('knowledge_base')
+        .select('*')
+        .order('created_at', { ascending: false });
+      setKnowledgeBase(kbData || []);
+      
+      alert("Documento adicionado à base de conhecimento com sucesso!");
+    } catch (err: any) {
+      console.error("Error uploading KB:", err);
+      alert(`Erro ao carregar: ${err.message}`);
+    } finally {
+      setIsUploadingKB(false);
+      // Reset input
+      e.target.value = '';
+    }
+  };
+
+  const handleDeleteKB = async (id: string, filePath: string) => {
+    if (!window.confirm("Tem a certeza que deseja remover este documento da base de conhecimento?")) return;
+
+    try {
+      const { error: storageError } = await supabase.storage
+        .from('knowledge-base')
+        .remove([filePath]);
+
+      if (storageError) throw storageError;
+
+      const { error: dbError } = await supabase
+        .from('knowledge_base')
+        .delete()
+        .eq('id', id);
+
+      if (dbError) throw dbError;
+
+      setKnowledgeBase(knowledgeBase.filter(item => item.id !== id));
+      alert("Documento removido.");
+    } catch (err: any) {
+      console.error("Error deleting KB:", err);
+      alert(`Erro ao remover: ${err.message}`);
+    }
   };
 
   if (profile?.role !== "Admin") {
@@ -457,6 +550,7 @@ export default function AdminDashboard() {
           <NavItem icon={Users} label="Profissionais" id="users" />
           <NavItem icon={MapPin} label="Campanhas" id="campaigns" />
           <NavItem icon={FileText} label="Consultas" id="consultations" />
+          <NavItem icon={BookOpen} label="Base de Conhecimento" id="knowledge" />
           
           <div className="pt-8 pb-2">
             <p className="px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Sistema</p>
@@ -940,6 +1034,65 @@ export default function AdminDashboard() {
                       </tbody>
                     </table>
                   </div>
+                </div>
+              </motion.div>
+            )}
+
+            {/* KNOWLEDGE BASE TAB */}
+            {activeTab === "knowledge" && (
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <h2 className="text-2xl font-bold text-slate-800">Base de Conhecimento IA</h2>
+                    <p className="text-slate-500 text-sm">Adicione PDFs com diretrizes para que a IA possa fornecer recomendações melhores.</p>
+                  </div>
+                  <div className="flex gap-3">
+                    <label className="flex items-center justify-center gap-2 px-4 py-2 bg-sky-600 text-white rounded-lg text-sm font-medium hover:bg-sky-700 transition-colors shadow-sm cursor-pointer">
+                      {isUploadingKB ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                      {isUploadingKB ? "Carregando..." : "Adicionar PDF"}
+                      <input 
+                        type="file" 
+                        accept=".pdf" 
+                        className="hidden" 
+                        onChange={handleUploadKB}
+                        disabled={isUploadingKB}
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {knowledgeBase.map((item) => (
+                    <div key={item.id} className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow flex flex-col">
+                      <div className="flex justify-between items-start mb-4">
+                        <div className="p-3 rounded-xl bg-sky-100 text-sky-600">
+                          <FileText className="w-6 h-6" />
+                        </div>
+                        <button 
+                          onClick={() => handleDeleteKB(item.id, item.file_path)}
+                          className="p-2 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                      <h3 className="text-lg font-bold text-slate-900 mb-1 line-clamp-2">{item.name}</h3>
+                      <p className="text-xs text-slate-500 mb-4">Adicionado em {new Date(item.created_at).toLocaleDateString()}</p>
+                      <a 
+                        href={item.file_url} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="mt-auto text-sm font-medium text-sky-600 hover:underline flex items-center gap-1"
+                      >
+                        Visualizar Documento <ChevronLeft className="w-4 h-4 rotate-180" />
+                      </a>
+                    </div>
+                  ))}
+                  {knowledgeBase.length === 0 && (
+                    <div className="col-span-full py-12 text-center bg-white border border-dashed border-slate-300 rounded-2xl">
+                      <BookOpen className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                      <p className="text-slate-500">Nenhum documento na base de conhecimento.</p>
+                    </div>
+                  )}
                 </div>
               </motion.div>
             )}

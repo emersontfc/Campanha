@@ -1,4 +1,14 @@
 import { GoogleGenAI } from "@google/genai";
+import { supabase } from "./supabase";
+
+async function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
 
 export async function analyzeConsultation(data: {
   weight: number;
@@ -29,7 +39,7 @@ Gere um relatório de triagem Racional, Conciso e Direto (máximo 150 palavras).
 ESTRUTURA OBRIGATÓRIA:
 1. ✅ PARÂMETROS NORMAIS: Liste apenas os nomes dos indicadores que estão dentro da normalidade.
 2. ⚠️ ALTERAÇÕES DETECTADAS: Explique brevemente o que está fora do padrão e o risco associado.
-3. 💡 RECOMENDAÇÕES: Sugestões não farmacológicas (dieta, exercício, hábitos).
+3. 💡 RECOMENDAÇÕES: Sugestões não farmacológicas (dieta, exercício, hábitos). Utilize as diretrizes fornecidas nos documentos da Base de Conhecimento se disponíveis.
 4. 🏥 SEGUIMENTO: Recomendação clara de quando e onde procurar apoio médico.
 
 ESTILO:
@@ -52,12 +62,38 @@ REFERÊNCIA DE NORMALIDADE:
 - Glicemia: 4.0 - 7.0 mmol/L
 - IMC: 18.5 - 24.9
 
-Gere a análise clínica racionalizada seguindo a estrutura solicitada.`;
+Gere a análise clínica racionalizada baseando-se nos dados acima e nas diretrizes dos documentos anexados (se houver).`;
 
   try {
+    const parts: any[] = [{ text: prompt }];
+
+    // Fetch Knowledge Base documents
+    const { data: kbDocs } = await supabase
+      .from('knowledge_base')
+      .select('file_url')
+      .limit(3); // Limit to 3 docs to avoid token/latency issues
+
+    if (kbDocs && kbDocs.length > 0) {
+      for (const doc of kbDocs) {
+        try {
+          const res = await fetch(doc.file_url);
+          const blob = await res.blob();
+          const base64 = await blobToBase64(blob);
+          parts.push({
+            inlineData: {
+              data: base64.split(',')[1],
+              mimeType: 'application/pdf'
+            }
+          });
+        } catch (e) {
+          console.error("Error loading KB doc:", e);
+        }
+      }
+    }
+
     const response = await ai.models.generateContent({
       model,
-      contents: [{ parts: [{ text: prompt }] }],
+      contents: { parts },
       config: {
         systemInstruction,
         temperature: 0.4,
@@ -65,11 +101,12 @@ Gere a análise clínica racionalizada seguindo a estrutura solicitada.`;
       },
     });
 
-    if (!response.text) {
+    const text = response.text;
+    if (!text) {
       throw new Error("Resposta vazia da IA");
     }
 
-    return response.text;
+    return text;
   } catch (error) {
     console.error("Error analyzing with Gemini:", error);
     return "Pedimos desculpa, mas não conseguimos gerar a análise automática agora. Por favor, fale com o profissional de saúde presente.";
