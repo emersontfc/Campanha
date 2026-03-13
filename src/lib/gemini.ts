@@ -23,12 +23,12 @@ export async function analyzeConsultation(data: {
   cvdRisk?: number;
   physicalExamination?: string;
 }) {
-  const model = "gemini-3-flash-preview";
+  const model = "gemini-flash-latest";
   
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     console.error("GEMINI_API_KEY is missing");
-    return "Erro: Chave API do Gemini não configurada. Por favor, adicione GEMINI_API_KEY nas definições do projeto.";
+    return "Erro: Chave API do Gemini não configurada. Por favor, adicione GEMINI_API_KEY nas definições do projeto (Settings > Secrets).";
   }
 
   const ai = new GoogleGenAI({ apiKey });
@@ -71,17 +71,20 @@ Gere a análise clínica racionalizada baseando-se nos dados acima e nas diretri
     const { data: kbDocs } = await supabase
       .from('knowledge_base')
       .select('file_url')
-      .limit(3); // Limit to 3 docs to avoid token/latency issues
+      .limit(2); // Reduced limit to avoid payload size issues
 
     if (kbDocs && kbDocs.length > 0) {
       for (const doc of kbDocs) {
         try {
           const res = await fetch(doc.file_url);
+          if (!res.ok) continue;
           const blob = await res.blob();
+          if (blob.size > 4 * 1024 * 1024) continue; // Skip files > 4MB
           const base64 = await blobToBase64(blob);
+          const base64Data = base64.includes(',') ? base64.split(',')[1] : base64;
           parts.push({
             inlineData: {
-              data: base64.split(',')[1],
+              data: base64Data,
               mimeType: 'application/pdf'
             }
           });
@@ -96,19 +99,29 @@ Gere a análise clínica racionalizada baseando-se nos dados acima e nas diretri
       contents: { parts },
       config: {
         systemInstruction,
-        temperature: 0.4,
+        temperature: 0.2, // Lower temperature for more consistent medical advice
         topP: 0.8,
       },
     });
 
     const text = response.text;
     if (!text) {
-      throw new Error("Resposta vazia da IA");
+      throw new Error("A IA retornou uma resposta vazia.");
     }
 
     return text;
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error analyzing with Gemini:", error);
-    return "Pedimos desculpa, mas não conseguimos gerar a análise automática agora. Por favor, fale com o profissional de saúde presente.";
+    const errorMessage = error?.message || String(error);
+    
+    if (errorMessage.includes("API key not valid")) {
+      return "Erro: A chave API do Gemini é inválida. Por favor, verifique as definições.";
+    }
+    
+    if (errorMessage.includes("quota")) {
+      return "Erro: Limite de utilização da IA atingido. Por favor, tente novamente mais tarde.";
+    }
+
+    return "Pedimos desculpa, mas não conseguimos gerar a análise automática agora devido a um erro técnico. Por favor, realize a análise manualmente.";
   }
 }
