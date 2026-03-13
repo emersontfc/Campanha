@@ -5,7 +5,8 @@ import { supabase } from "../lib/supabase";
 import { useAuth } from "../hooks/useAuth";
 import { analyzeConsultation } from "../lib/gemini";
 import { calculateBMI, calculateFraminghamRisk } from "../lib/utils";
-import { ChevronLeft, Sparkles, Save, Loader2, MapPin, User, History, Activity, AlertCircle } from "lucide-react";
+import Markdown from 'react-markdown';
+import { ChevronLeft, Sparkles, Save, Loader2, MapPin, User, History, Activity, AlertCircle, Eye, Edit3 } from "lucide-react";
 import { Campaign } from "../types";
 
 export default function EditConsultation() {
@@ -42,6 +43,7 @@ export default function EditConsultation() {
   });
 
   const [aiAnalysis, setAiAnalysis] = useState("");
+  const [isPreviewMode, setIsPreviewMode] = useState(false);
   const [previousConsultations, setPreviousConsultations] = useState<any[]>([]);
   const bmi = calculateBMI(Number(formData.weight), Number(formData.height));
   
@@ -585,7 +587,19 @@ export default function EditConsultation() {
 
           <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="font-bold text-slate-900">Análise IA Gemini</h2>
+              <div className="flex items-center gap-2">
+                <h2 className="font-bold text-slate-900">Análise IA Gemini</h2>
+                {aiAnalysis && (
+                  <button
+                    type="button"
+                    onClick={() => setIsPreviewMode(!isPreviewMode)}
+                    className="p-1.5 text-slate-400 hover:text-cyan-600 transition-colors"
+                    title={isPreviewMode ? "Editar" : "Visualizar"}
+                  >
+                    {isPreviewMode ? <Edit3 className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                )}
+              </div>
               <button
                 type="button"
                 onClick={handleGenerateAI}
@@ -597,11 +611,17 @@ export default function EditConsultation() {
               </button>
             </div>
             
-            <textarea
-              className="w-full h-40 px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-cyan-500 outline-none text-sm text-slate-600"
-              value={aiAnalysis}
-              onChange={(e) => setAiAnalysis(e.target.value)}
-            />
+            {isPreviewMode && aiAnalysis ? (
+              <div className="prose prose-sm max-w-none p-4 bg-slate-50 rounded-xl border border-slate-200 min-h-[160px]">
+                <Markdown>{aiAnalysis}</Markdown>
+              </div>
+            ) : (
+              <textarea
+                className="w-full h-40 px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-cyan-500 outline-none text-sm text-slate-600"
+                value={aiAnalysis}
+                onChange={(e) => setAiAnalysis(e.target.value)}
+              />
+            )}
           </div>
 
           <button

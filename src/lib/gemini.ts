@@ -23,43 +23,51 @@ export async function analyzeConsultation(data: {
 
   const ai = new GoogleGenAI({ apiKey });
   
-  const systemInstruction = `Você é um Arquiteto de Saúde e Médico Especialista da Al-Shifa Health Initiative em Moçambique.
-Sua tarefa é analisar dados biométricos de triagens comunitárias e gerar um relatório humanizado, preventivo e educativo.
+  const systemInstruction = `Você é um Médico Especialista da Al-Shifa Health em Moçambique.
+Gere um relatório de triagem Racional, Conciso e Direto (máximo 150 palavras).
 
-DIRETRIZES:
-1. Linguagem: Português de Moçambique, simples, empática e direta.
-2. Foco: Prevenção de Doenças Não Transmissíveis (DNTs).
-3. Estrutura: 
-   - Saudação calorosa.
-   - Explicação do IMC (Peso vs Altura).
-   - Explicação da Tensão Arterial (Risco Cardiovascular).
-   - Explicação da Glicemia (Risco de Diabetes).
-   - 3 Recomendações práticas de estilo de vida.
-   - Encorajamento para seguimento médico.
+ESTRUTURA OBRIGATÓRIA:
+1. ✅ PARÂMETROS NORMAIS: Liste apenas os nomes dos indicadores que estão dentro da normalidade.
+2. ⚠️ ALTERAÇÕES DETECTADAS: Explique brevemente o que está fora do padrão e o risco associado.
+3. 💡 RECOMENDAÇÕES: Sugestões não farmacológicas (dieta, exercício, hábitos).
+4. 🏥 SEGUIMENTO: Recomendação clara de quando e onde procurar apoio médico.
 
-IMPORTANTE: Não use termos técnicos complexos. Seja motivador, não alarmista.`;
+ESTILO:
+- Use Markdown para estruturar (negrito para destaques).
+- Tom profissional, empático e focado em Moçambique.
+- Evite introduções longas ou saudações excessivas. Vá direto aos pontos.`;
 
-  const prompt = `DADOS CLÍNICOS PARA ANÁLISE:
-- IMC: ${data.bmi.toFixed(2)} (Peso: ${data.weight}kg, Altura: ${data.height}cm)
-- Tensão Arterial: ${data.systolic}/${data.diastolic} mmHg
-- Glicemia: ${data.glucose} mmol/L (Millimol por litro)
-- Sexo: ${data.patientSex === 'M' ? 'Masculino' : 'Feminino'}
+  const prompt = `DADOS DO PACIENTE:
+- IMC: ${data.bmi.toFixed(1)} (Peso: ${data.weight}kg, Altura: ${data.height}cm)
+- TA: ${data.systolic}/${data.diastolic} mmHg
+- Glicemia: ${data.glucose} mmol/L
+- Sexo: ${data.patientSex === 'M' ? 'Masc' : 'Fem'}
 - Fumador: ${data.isSmoker ? 'Sim' : 'Não'}
-- Em tratamento para Hipertensão: ${data.isTreated ? 'Sim' : 'Não'}
-- Risco Cardiovascular (Framingham): ${data.cvdRisk}% (Risco de evento em 10 anos)
-- Nota: Considere 4.0 a 7.0 mmol/L como normal em jejum.
+- Em tratamento TA: ${data.isTreated ? 'Sim' : 'Não'}
+- Risco CVD (10 anos): ${data.cvdRisk}%
 ${data.physicalExamination ? `- Exame Físico: ${data.physicalExamination}` : ''}
 
-Por favor, gere o relatório de saúde para o paciente.`;
+REFERÊNCIA DE NORMALIDADE:
+- TA: < 130/85 mmHg
+- Glicemia: 4.0 - 7.0 mmol/L
+- IMC: 18.5 - 24.9
+
+Gere a análise clínica racionalizada seguindo a estrutura solicitada.`;
 
   try {
     const response = await ai.models.generateContent({
       model,
-      contents: prompt,
+      contents: [{ parts: [{ text: prompt }] }],
       config: {
         systemInstruction,
+        temperature: 0.4,
+        topP: 0.8,
       },
     });
+
+    if (!response.text) {
+      throw new Error("Resposta vazia da IA");
+    }
 
     return response.text;
   } catch (error) {
