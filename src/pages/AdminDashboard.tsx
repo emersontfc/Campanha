@@ -305,16 +305,22 @@ export default function AdminDashboard() {
   const handleDeleteUser = async (userId: string) => {
     if (!window.confirm("Tem a certeza que deseja remover este utilizador? Esta ação não pode ser desfeita.")) return;
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .delete()
-        .eq('id', userId);
+      const response = await fetch("/api/admin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "delete-user", id: userId })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Erro ao remover utilizador do servidor");
+      }
         
-      if (error) throw error;
       setUsers(users.filter(u => u.id !== userId));
-    } catch (err) {
+      alert("Utilizador removido com sucesso.");
+    } catch (err: any) {
       console.error("Error deleting user:", err);
-      alert("Erro ao remover o utilizador.");
+      alert(`Erro ao remover o utilizador: ${err.message}`);
     }
     setActiveDropdown(null);
   };

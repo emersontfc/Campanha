@@ -34,20 +34,37 @@ export default async function handler(req: any, res: any) {
       const { data: profiles, error: profileError } = await supabaseAdmin.from('profiles').select('*');
       if (profileError) throw profileError;
 
-      const mergedUsers = authUsers.map(authUser => {
-        const profile = profiles?.find(p => p.id === authUser.id);
-        return {
-          id: authUser.id,
-          email: authUser.email,
-          name: profile?.name || authUser.user_metadata?.name || authUser.user_metadata?.full_name || 'Sem Nome',
-          role: profile?.role || authUser.user_metadata?.role || 'MedicalProfessional',
-          specialty: profile?.specialty || authUser.user_metadata?.specialty || '',
-          is_verified: profile?.is_verified ?? false,
-          created_at: authUser.created_at,
-          has_profile: !!profile
-        };
-      });
+      const mergedUsers = authUsers
+        .map(authUser => {
+          const profile = profiles?.find(p => p.id === authUser.id);
+          return {
+            id: authUser.id,
+            email: authUser.email,
+            name: profile?.name || authUser.user_metadata?.name || authUser.user_metadata?.full_name || 'Sem Nome',
+            role: profile?.role || authUser.user_metadata?.role || 'MedicalProfessional',
+            specialty: profile?.specialty || authUser.user_metadata?.specialty || '',
+            is_verified: profile?.is_verified ?? false,
+            created_at: authUser.created_at,
+            has_profile: !!profile
+          };
+        })
+        .filter(user => user.has_profile);
       return res.status(200).json(mergedUsers);
+    }
+
+    if (action === 'delete-user') {
+      const { id } = req.body;
+      if (!id) return res.status(400).json({ error: "ID do utilizador é obrigatório" });
+
+      // Delete from profiles first
+      const { error: profileError } = await supabaseAdmin.from('profiles').delete().eq('id', id);
+      if (profileError) throw profileError;
+
+      // Delete from auth
+      const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(id);
+      if (authError) throw authError;
+
+      return res.status(200).json({ success: true });
     }
 
     if (action === 'create-user') {
