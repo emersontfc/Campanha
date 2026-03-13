@@ -65,14 +65,19 @@ export default function AdminDashboard() {
         .select('*')
         .order('created_at', { ascending: false });
       
-      if (campaignError) throw new Error(`Campaigns Error: ${campaignError.message}`);
+      if (campaignError) throw new Error(`Erro nas Campanhas: ${campaignError.message}`);
       setCampaigns(campaignData || []);
 
-      // Fetch Users from the server API to include Auth users without profiles
-      const userResponse = await fetch("/api/admin?action=list-users");
+      // Fetch Users from the server API
+      console.log("Fetching users from /api/admin...");
+      const userResponse = await fetch("/api/admin?action=list-users").catch(err => {
+        console.error("Fetch error:", err);
+        throw new Error(`Falha na ligação ao servidor: ${err.message || "Network Error"}`);
+      });
+
       if (!userResponse.ok) {
         const errorData = await userResponse.json().catch(() => ({}));
-        throw new Error(errorData.error || "Erro ao carregar utilizadores do servidor");
+        throw new Error(errorData.error || `Erro do servidor (${userResponse.status})`);
       }
       const userData = await userResponse.json();
       setUsers(userData || []);

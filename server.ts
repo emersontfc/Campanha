@@ -16,6 +16,11 @@ async function startServer() {
 
   app.use(express.json());
 
+  // Health check
+  app.get("/api/health", (req, res) => {
+    res.json({ status: "ok", timestamp: new Date().toISOString() });
+  });
+
   const supabaseUrl = process.env.VITE_SUPABASE_URL!;
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -27,8 +32,8 @@ async function startServer() {
       });
     }
 
-    const action = req.query.action || req.body.action;
-    const email = req.body.email;
+    const action = req.query.action || (req.body ? req.body.action : null);
+    const email = req.body ? req.body.email : null;
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
     console.log(`[Admin API] Action: ${action}, Method: ${req.method}`);
@@ -49,22 +54,48 @@ async function startServer() {
           throw profileError;
         }
 
-        const mergedUsers = authUsers.map(authUser => {
-          const profile = profiles?.find(p => p.id === authUser.id);
-          return {
-            id: authUser.id,
-            email: authUser.email,
-            name: profile?.name || authUser.user_metadata?.name || authUser.user_metadata?.full_name || 'Sem Nome',
-            role: profile?.role || authUser.user_metadata?.role || 'MedicalProfessional',
-            specialty: profile?.specialty || authUser.user_metadata?.specialty || '',
-            is_verified: profile?.is_verified ?? false,
-            created_at: authUser.created_at,
-            has_profile: !!profile
-          };
-        });
+        const mergedUsers = authUsers
+          .map(authUser => {
+            const profile = profiles?.find(p => p.id === authUser.id);
+            return {
+              id: authUser.id,
+              email: authUser.email,
+              name: profile?.name || authUser.user_metadata?.name || authUser.user_metadata?.full_name || 'Sem Nome',
+              role: profile?.role || authUser.user_metadata?.role || 'MedicalProfessional',
+              specialty: profile?.specialty || authUser.user_metadata?.specialty || '',
+              is_verified: profile?.is_verified ?? false,
+              created_at: authUser.created_at,
+              has_profile: !!profile
+            };
+          })
+          .filter(user => user.has_profile);
         
-        console.log(`[Admin API] Successfully merged ${mergedUsers.length} users.`);
+        console.log(`[Admin API] Successfully merged and filtered ${mergedUsers.length} users.`);
         return res.json(mergedUsers);
+      }
+
+      if (action === 'delete-user') {
+        const { id } = req.body;
+        if (!id) return res.status(400).json({ error: "ID do utilizador é obrigatório" });
+
+        console.log(`[Admin API] Deleting user: ${id}`);
+        
+        // Delete from profiles first
+        const { error: profileError } = await supabaseAdmin.from('profiles').delete().eq('id', id);
+        if (profileError) {
+          console.error("[Admin API] Profile Delete Error:", profileError);
+          throw profileError;
+        }
+
+        // Delete from auth
+        const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(id);
+        if (authError) {
+          console.error("[Admin API] Auth Delete Error:", authError);
+          throw authError;
+        }
+
+        console.log(`[Admin API] User ${id} deleted successfully.`);
+        return res.json({ success: true });
       }
 
       if (action === 'create-user') {
