@@ -100,8 +100,30 @@ export default function NewConsultation() {
   };
 
   const handleGenerateAI = async () => {
-    if (!formData.weight || !formData.height || !formData.systolic || !formData.diastolic || !formData.glucose) {
-      alert("Por favor preencha todos os campos biométricos.");
+    let finalSystolic = Number(formData.systolic);
+    let finalDiastolic = Number(formData.diastolic);
+    let bpNote = "";
+
+    if (formData.isBilateral) {
+      if (!formData.systolicLeft || !formData.diastolicLeft || !formData.systolicRight || !formData.diastolicRight) {
+        alert("Por favor preencha todos os campos biométricos (pressão arterial em ambos os braços).");
+        return;
+      }
+      finalSystolic = Math.max(Number(formData.systolicLeft), Number(formData.systolicRight));
+      finalDiastolic = Number(formData.systolicRight) >= Number(formData.systolicLeft) 
+        ? Number(formData.diastolicRight) 
+        : Number(formData.diastolicLeft);
+      
+      bpNote = `\n\n[AVALIAÇÃO BILATERAL AHA]\nBraço Direito: ${formData.systolicRight}/${formData.diastolicRight} mmHg\nBraço Esquerdo: ${formData.systolicLeft}/${formData.diastolicLeft} mmHg\nDiferença: ${Math.abs(Number(formData.systolicRight) - Number(formData.systolicLeft))} mmHg`;
+    } else {
+      if (!formData.systolic || !formData.diastolic) {
+        alert("Por favor preencha a pressão arterial.");
+        return;
+      }
+    }
+
+    if (!formData.weight || !formData.height || !formData.glucose) {
+      alert("Por favor preencha todos os campos biométricos (peso, altura, glicemia).");
       return;
     }
 
@@ -111,14 +133,14 @@ export default function NewConsultation() {
         weight: Number(formData.weight),
         height: Number(formData.height),
         bmi,
-        systolic: Number(formData.systolic),
-        diastolic: Number(formData.diastolic),
+        systolic: finalSystolic,
+        diastolic: finalDiastolic,
         glucose: Number(formData.glucose),
         patientSex: formData.patientSex,
         isSmoker: formData.isSmoker,
         isTreated: formData.isTreated,
         cvdRisk: cvdRisk,
-        physicalExamination: formData.physicalExamination,
+        physicalExamination: (formData.physicalExamination || "") + bpNote,
       });
       
       if (analysis.startsWith("Erro:")) {
