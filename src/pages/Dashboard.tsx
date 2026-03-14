@@ -2,7 +2,7 @@ import * as React from "react";
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../hooks/useAuth";
-import { Plus, Users, ClipboardList, Activity, LogOut, ShieldCheck, Wifi, WifiOff, Loader2, Trash2 } from "lucide-react";
+import { Plus, Users, ClipboardList, Activity, LogOut, ShieldCheck, Wifi, WifiOff, Loader2, Trash2, Edit2 } from "lucide-react";
 import { VerifiedBadge } from "../components/VerifiedBadge";
 import { Link, useNavigate } from "react-router-dom";
 
@@ -332,10 +332,10 @@ export default function Dashboard() {
               </div>
             ) : (
               recentConsultations.map((c) => (
-                <Link
+                <div
                   key={c.id}
-                  to={`/patient?id=${c.consultation_id}`}
-                  className="block bg-white p-4 rounded-2xl border border-slate-100 shadow-sm active:bg-slate-50 transition-colors"
+                  onClick={() => navigate(`/patient?id=${c.consultation_id}`)}
+                  className="block bg-white p-4 rounded-2xl border border-slate-100 shadow-sm hover:bg-slate-50 cursor-pointer transition-colors"
                 >
                   <div className="flex justify-between items-start mb-2">
                     <div>
@@ -344,24 +344,37 @@ export default function Dashboard() {
                         {new Date(c.created_at).toLocaleDateString()}
                       </span>
                     </div>
-                    <button
-                      onClick={(e) => handleDeleteConsultation(e, c.id)}
-                      disabled={deletingId === c.id}
-                      className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                      title="Eliminar Consulta"
-                    >
-                      {deletingId === c.id ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Trash2 className="w-4 h-4" />
-                      )}
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          navigate(`/edit-consultation?id=${c.consultation_id}`);
+                        }}
+                        className="p-2 text-slate-400 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-colors"
+                        title="Editar Consulta"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={(e) => handleDeleteConsultation(e, c.id)}
+                        disabled={deletingId === c.id}
+                        className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Eliminar Consulta"
+                      >
+                        {deletingId === c.id ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-4 h-4" />
+                        )}
+                      </button>
+                    </div>
                   </div>
                   <div className="flex gap-4 text-sm text-slate-500 mt-2">
                     <span>IMC: {c.bmi.toFixed(1)}</span>
                     <span>TA: {c.blood_pressure}</span>
                   </div>
-                </Link>
+                </div>
               ))
             )}
           </div>

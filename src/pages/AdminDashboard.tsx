@@ -1025,13 +1025,22 @@ export default function AdminDashboard() {
                               </span>
                             </td>
                             <td className="px-6 py-4 text-right">
-                              <button
-                                onClick={(e) => handleDeleteConsultation(e, c.id)}
-                                className="p-2 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors"
-                                title="Eliminar consulta"
-                              >
-                                <Trash2 className="w-5 h-5" />
-                              </button>
+                              <div className="flex items-center justify-end gap-2">
+                                <button
+                                  onClick={() => navigate(`/edit-consultation?id=${c.consultation_id}`)}
+                                  className="p-2 text-slate-400 hover:text-sky-600 rounded-lg hover:bg-sky-50 transition-colors"
+                                  title="Editar consulta"
+                                >
+                                  <Edit2 className="w-5 h-5" />
+                                </button>
+                                <button
+                                  onClick={(e) => handleDeleteConsultation(e, c.id)}
+                                  className="p-2 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors"
+                                  title="Eliminar consulta"
+                                >
+                                  <Trash2 className="w-5 h-5" />
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         ))}

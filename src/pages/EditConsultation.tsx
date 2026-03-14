@@ -6,7 +6,7 @@ import { useAuth } from "../hooks/useAuth";
 import { analyzeConsultation } from "../lib/gemini";
 import { calculateBMI, calculateFraminghamRisk } from "../lib/utils";
 import Markdown from 'react-markdown';
-import { ChevronLeft, Sparkles, Save, Loader2, MapPin, User, History, Activity, AlertCircle, Eye, Edit3 } from "lucide-react";
+import { ChevronLeft, Sparkles, Save, Loader2, MapPin, User, History, Activity, AlertCircle, Eye, Edit3, Share2, UserPlus, X, Send } from "lucide-react";
 import { Campaign } from "../types";
 
 export default function EditConsultation() {
@@ -18,7 +18,12 @@ export default function EditConsultation() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
+  const [transferring, setTransferring] = useState(false);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [professionals, setProfessionals] = useState<any[]>([]);
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [selectedProfessional, setSelectedProfessional] = useState("");
+  const [consultationOwnerId, setConsultationOwnerId] = useState<string | null>(null);
   
   const [formData, setFormData] = useState({
     patientName: "",
@@ -63,13 +68,23 @@ export default function EditConsultation() {
     const fetchData = async () => {
       if (!id) return;
       
-      const [consRes, campRes] = await Promise.all([
+      const [consRes, campRes, profRes] = await Promise.all([
         supabase.from('consultations').select('*').eq('consultation_id', id).single(),
-        supabase.from('campaigns').select('*').eq('active', true)
+        supabase.from('campaigns').select('*').eq('active', true),
+        supabase.from('profiles').select('id, name, specialty').eq('role', 'MedicalProfessional').eq('is_verified', true)
       ]);
 
       if (consRes.data) {
         const c = consRes.data;
+        setConsultationOwnerId(c.professional_id);
+        
+        // Permission check: Only owner or admin can edit
+        if (profile && profile.role !== 'Admin' && c.professional_id !== user?.id) {
+          alert("Não tem permissão para editar esta consulta.");
+          navigate(`/patient?id=${id}`);
+          return;
+        }
+
         setFormData({
           patientName: c.patient_name,
           patientAge: String(c.patient_age),
@@ -110,6 +125,7 @@ export default function EditConsultation() {
       }
       
       if (campRes.data) setCampaigns(campRes.data);
+      if (profRes.data) setProfessionals(profRes.data);
       setLoading(false);
     };
     
@@ -242,6 +258,36 @@ export default function EditConsultation() {
     }
   };
 
+  const handleTransfer = async () => {
+    if (!selectedProfessional) return;
+    
+    const prof = professionals.find(p => p.id === selectedProfessional);
+    if (!prof) return;
+
+    setTransferring(true);
+    try {
+      const { error } = await supabase
+        .from('consultations')
+        .update({
+          professional_id: prof.id,
+          professional_name: prof.name,
+          status: 'accepted' // Set back to accepted so the new doctor sees it as active
+        })
+        .eq('consultation_id', id);
+
+      if (error) throw error;
+      
+      alert(`Consulta transferida com sucesso para ${prof.name}.`);
+      navigate('/dashboard');
+    } catch (err: any) {
+      console.error("Transfer Error:", err);
+      alert(`Erro ao transferir consulta: ${err.message}`);
+    } finally {
+      setTransferring(false);
+      setShowTransferModal(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-slate-50">
@@ -258,6 +304,17 @@ export default function EditConsultation() {
             <ChevronLeft className="w-6 h-6" />
           </button>
           <h1 className="font-bold text-slate-900">Completar Triagem</h1>
+          
+          <div className="ml-auto flex items-center gap-2">
+            <button 
+              type="button"
+              onClick={() => setShowTransferModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl font-bold text-xs hover:bg-slate-50 transition-all active:scale-[0.98]"
+            >
+              <Share2 className="w-4 h-4" />
+              Transferir
+            </button>
+          </div>
         </div>
       </header>
 
@@ -634,6 +691,65 @@ export default function EditConsultation() {
           </button>
         </form>
       </main>
+
+      {/* Transfer Modal */}
+      {showTransferModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-md rounded-[2rem] shadow-2xl border border-slate-100 overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="p-6 border-b border-slate-50 flex items-center justify-between">
+              <h3 className="font-black text-slate-900 flex items-center gap-2 uppercase tracking-tight">
+                <UserPlus className="w-5 h-5 text-cyan-600" />
+                Transferir Prontuário
+              </h3>
+              <button onClick={() => setShowTransferModal(false)} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
+                <X className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              <p className="text-sm text-slate-500 leading-relaxed">
+                Selecione outro profissional para continuar a avaliação deste paciente. O prontuário será movido para a lista de atendimentos dele.
+              </p>
+              
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Selecionar Médico</label>
+                <select 
+                  className="w-full px-4 py-3 rounded-2xl border border-slate-100 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-cyan-500 outline-none transition-all text-sm font-bold"
+                  value={selectedProfessional}
+                  onChange={(e) => setSelectedProfessional(e.target.value)}
+                >
+                  <option value="">Escolha um profissional...</option>
+                  {professionals
+                    .filter(p => p.id !== user?.id)
+                    .map(p => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} ({p.specialty || 'Clínico Geral'})
+                      </option>
+                    ))
+                  }
+                </select>
+              </div>
+            </div>
+            
+            <div className="p-6 bg-slate-50 flex gap-3">
+              <button 
+                onClick={() => setShowTransferModal(false)}
+                className="flex-1 px-6 py-3 bg-white border border-slate-200 text-slate-600 rounded-2xl font-bold text-sm hover:bg-slate-100 transition-all"
+              >
+                Cancelar
+              </button>
+              <button 
+                onClick={handleTransfer}
+                disabled={!selectedProfessional || transferring}
+                className="flex-[2] px-6 py-3 bg-slate-900 text-white rounded-2xl font-bold text-sm hover:bg-slate-800 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {transferring ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                Confirmar Transferência
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
