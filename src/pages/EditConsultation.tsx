@@ -4,7 +4,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../hooks/useAuth";
 import { analyzeConsultation } from "../lib/gemini";
-import { calculateBMI, calculateFraminghamRisk } from "../lib/utils";
+import { calculateBMI, calculateFraminghamRisk, formatMozPhone } from "../lib/utils";
 import Markdown from 'react-markdown';
 import { ChevronLeft, Sparkles, Save, Loader2, MapPin, User, History, Activity, AlertCircle, Eye, Edit3, Share2, UserPlus, X, Send } from "lucide-react";
 import { Campaign } from "../types";
@@ -24,6 +24,7 @@ export default function EditConsultation() {
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [selectedProfessional, setSelectedProfessional] = useState("");
   const [consultationOwnerId, setConsultationOwnerId] = useState<string | null>(null);
+  const [consultationStatus, setConsultationStatus] = useState<string | null>(null);
   
   const [formData, setFormData] = useState({
     patientName: "",
@@ -77,6 +78,7 @@ export default function EditConsultation() {
       if (consRes.data) {
         const c = consRes.data;
         setConsultationOwnerId(c.professional_id);
+        setConsultationStatus(c.status);
         
         // Permission check: Only owner or admin can edit
         if (profile && profile.role !== 'Admin' && c.professional_id !== user?.id) {
@@ -189,6 +191,78 @@ export default function EditConsultation() {
     }
   };
 
+  const handleSaveDraft = async () => {
+    if (!user) return;
+    if (campaigns.length > 0 && !formData.campaignId) {
+      alert("Por favor selecione uma campanha.");
+      return;
+    }
+    if (!formData.patientName || !formData.patientAge) {
+      alert("Para salvar um rascunho, preencha pelo menos o nome e a idade do paciente.");
+      return;
+    }
+    
+    setSaving(true);
+    
+    let profName = profile?.name;
+    if (!profName && user) {
+      const { data: profData } = await supabase.from('profiles').select('name').eq('id', user.id).single();
+      if (profData) profName = profData.name;
+    }
+
+    let finalSystolic = Number(formData.systolic) || 0;
+    let finalDiastolic = Number(formData.diastolic) || 0;
+    let bpNote = "";
+
+    if (formData.isBilateral) {
+      finalSystolic = Math.max(Number(formData.systolicLeft) || 0, Number(formData.systolicRight) || 0);
+      finalDiastolic = Math.max(Number(formData.diastolicLeft) || 0, Number(formData.diastolicRight) || 0);
+      if (formData.systolicRight || formData.systolicLeft) {
+        bpNote = `\n\n[AVALIAÇÃO BILATERAL AHA]\nBraço Direito: ${formData.systolicRight || 0}/${formData.diastolicRight || 0} mmHg\nBraço Esquerdo: ${formData.systolicLeft || 0}/${formData.diastolicLeft || 0} mmHg`;
+      }
+    }
+
+    const updateData: any = {
+      patient_name: formData.patientName,
+      patient_age: Number(formData.patientAge),
+      patient_phone: formData.patientPhone ? formatMozPhone(formData.patientPhone) : "",
+      weight: Number(formData.weight) || 0,
+      height: Number(formData.height) || 0,
+      bmi: Number(bmi.toFixed(1)) || 0,
+      blood_pressure: `${finalSystolic}/${finalDiastolic}`,
+      systolic: finalSystolic,
+      diastolic: finalDiastolic,
+      glucose: Number(formData.glucose) || 0,
+      patient_sex: formData.patientSex,
+      is_smoker: formData.isSmoker,
+      is_on_hypertension_treatment: formData.isTreated,
+      cvd_risk_score: cvdRisk || 0,
+      physical_examination: (formData.physicalExamination || "") + bpNote,
+      ai_analysis: aiAnalysis || "Rascunho",
+      status: 'draft',
+    };
+    
+    if (formData.campaignId) {
+      updateData.campaign_id = formData.campaignId;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('consultations')
+        .update(updateData)
+        .eq('consultation_id', id);
+
+      if (error) throw error;
+      
+      navigate('/dashboard');
+    } catch (err: any) {
+      console.error("Draft Error:", err);
+      alert(`Erro ao salvar rascunho: ${err.message || "Erro desconhecido"}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
@@ -287,14 +361,49 @@ export default function EditConsultation() {
     if (!prof) return;
 
     setTransferring(true);
+    
+    let finalSystolic = Number(formData.systolic) || 0;
+    let finalDiastolic = Number(formData.diastolic) || 0;
+    let bpNote = "";
+
+    if (formData.isBilateral) {
+      finalSystolic = Math.max(Number(formData.systolicLeft) || 0, Number(formData.systolicRight) || 0);
+      finalDiastolic = Math.max(Number(formData.diastolicLeft) || 0, Number(formData.diastolicRight) || 0);
+      if (formData.systolicRight || formData.systolicLeft) {
+        bpNote = `\n\n[AVALIAÇÃO BILATERAL AHA]\nBraço Direito: ${formData.systolicRight || 0}/${formData.diastolicRight || 0} mmHg\nBraço Esquerdo: ${formData.systolicLeft || 0}/${formData.diastolicLeft || 0} mmHg`;
+      }
+    }
+
+    const updateData: any = {
+      patient_name: formData.patientName,
+      patient_age: Number(formData.patientAge),
+      patient_phone: formData.patientPhone ? formatMozPhone(formData.patientPhone) : "",
+      weight: Number(formData.weight) || 0,
+      height: Number(formData.height) || 0,
+      bmi: Number(bmi.toFixed(1)) || 0,
+      blood_pressure: `${finalSystolic}/${finalDiastolic}`,
+      systolic: finalSystolic,
+      diastolic: finalDiastolic,
+      glucose: Number(formData.glucose) || 0,
+      patient_sex: formData.patientSex,
+      is_smoker: formData.isSmoker,
+      is_on_hypertension_treatment: formData.isTreated,
+      cvd_risk_score: cvdRisk || 0,
+      physical_examination: (formData.physicalExamination || "") + bpNote,
+      ai_analysis: aiAnalysis || "Rascunho",
+      professional_id: prof.id,
+      professional_name: prof.name,
+      status: consultationStatus === 'draft' ? 'draft' : 'accepted' // Keep as draft if it was a draft
+    };
+    
+    if (formData.campaignId) {
+      updateData.campaign_id = formData.campaignId;
+    }
+
     try {
       const { error } = await supabase
         .from('consultations')
-        .update({
-          professional_id: prof.id,
-          professional_name: prof.name,
-          status: 'accepted' // Set back to accepted so the new doctor sees it as active
-        })
+        .update(updateData)
         .eq('consultation_id', id);
 
       if (error) throw error;
@@ -703,14 +812,25 @@ export default function EditConsultation() {
             )}
           </div>
 
-          <button
-            type="submit"
-            disabled={saving}
-            className="w-full bg-slate-900 text-white font-bold py-4 rounded-2xl shadow-lg flex items-center justify-center gap-2 active:scale-[0.98] transition-all disabled:opacity-50"
-          >
-            {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-            Finalizar Atendimento
-          </button>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <button
+              type="button"
+              onClick={handleSaveDraft}
+              disabled={saving}
+              className="w-full bg-slate-100 text-slate-700 font-bold py-4 rounded-2xl shadow-sm flex items-center justify-center gap-2 hover:bg-slate-200 active:scale-[0.98] transition-all disabled:opacity-50"
+            >
+              {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+              Guardar como Rascunho
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="w-full bg-slate-900 text-white font-bold py-4 rounded-2xl shadow-lg flex items-center justify-center gap-2 active:scale-[0.98] transition-all disabled:opacity-50"
+            >
+              {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+              Finalizar Atendimento
+            </button>
+          </div>
         </form>
       </main>
 

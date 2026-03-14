@@ -41,6 +41,8 @@ export default function NewConsultation() {
   const [aiAnalysis, setAiAnalysis] = useState("");
   const [isPreviewMode, setIsPreviewMode] = useState(false);
   const [previousConsultations, setPreviousConsultations] = useState<any[]>([]);
+  const [professionals, setProfessionals] = useState<any[]>([]);
+  const [assignedDoctor, setAssignedDoctor] = useState<string>("");
   const bmi = calculateBMI(Number(formData.weight), Number(formData.height));
   
   const cvdRisk = calculateFraminghamRisk(
@@ -63,7 +65,15 @@ export default function NewConsultation() {
         .eq('active', true);
       if (data) setCampaigns(data);
     };
+    const fetchProfessionals = async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, name')
+        .eq('is_verified', true);
+      if (data) setProfessionals(data);
+    };
     fetchCampaigns();
+    fetchProfessionals();
   }, []);
 
   useEffect(() => {
@@ -153,6 +163,101 @@ export default function NewConsultation() {
       alert("Erro ao comunicar com a IA. Verifique a consola.");
     } finally {
       setAnalyzing(false);
+    }
+  };
+
+  const handleSaveDraft = async () => {
+    if (!user) return;
+    if (campaigns.length > 0 && !formData.campaignId) {
+      alert("Por favor selecione uma campanha.");
+      return;
+    }
+    if (!formData.patientName || !formData.patientAge) {
+      alert("Para salvar um rascunho, preencha pelo menos o nome e a idade do paciente.");
+      return;
+    }
+    
+    setLoading(true);
+    
+    let profName = profile?.name;
+    if (!profName && user) {
+      const { data: profData } = await supabase.from('profiles').select('name').eq('id', user.id).single();
+      if (profData) profName = profData.name;
+    }
+
+    const saveDraft = async (attempts = 0): Promise<string> => {
+      try {
+        const consultationId = generateConsultationId();
+        
+        let finalSystolic = Number(formData.systolic) || 0;
+        let finalDiastolic = Number(formData.diastolic) || 0;
+        let bpNote = "";
+
+        if (formData.isBilateral) {
+          finalSystolic = Math.max(Number(formData.systolicLeft) || 0, Number(formData.systolicRight) || 0);
+          finalDiastolic = Math.max(Number(formData.diastolicLeft) || 0, Number(formData.diastolicRight) || 0);
+          if (formData.systolicRight || formData.systolicLeft) {
+            bpNote = `\n\n[AVALIAÇÃO BILATERAL AHA]\nBraço Direito: ${formData.systolicRight || 0}/${formData.diastolicRight || 0} mmHg\nBraço Esquerdo: ${formData.systolicLeft || 0}/${formData.diastolicLeft || 0} mmHg`;
+          }
+        }
+
+        const targetProfessionalId = assignedDoctor || user.id;
+        const targetProfessionalName = assignedDoctor 
+          ? professionals.find(p => p.id === assignedDoctor)?.name || profName
+          : profName;
+
+        const insertData: any = {
+          consultation_id: consultationId,
+          professional_id: targetProfessionalId,
+          professional_name: targetProfessionalName || "Profissional",
+          patient_name: formData.patientName,
+          patient_age: Number(formData.patientAge),
+          patient_phone: formData.patientPhone ? formatMozPhone(formData.patientPhone) : "",
+          weight: Number(formData.weight) || 0,
+          height: Number(formData.height) || 0,
+          bmi: Number(bmi.toFixed(1)) || 0,
+          blood_pressure: `${finalSystolic}/${finalDiastolic}`,
+          systolic: finalSystolic,
+          diastolic: finalDiastolic,
+          glucose: Number(formData.glucose) || 0,
+          patient_sex: formData.patientSex,
+          is_smoker: formData.isSmoker,
+          is_on_hypertension_treatment: formData.isTreated,
+          cvd_risk_score: cvdRisk || 0,
+          physical_examination: (formData.physicalExamination || "") + bpNote,
+          ai_analysis: aiAnalysis || "Rascunho",
+          status: 'draft',
+        };
+        
+        if (formData.campaignId) {
+          insertData.campaign_id = formData.campaignId;
+        }
+
+        const { error } = await supabase
+          .from('consultations')
+          .insert([insertData]);
+          
+        if (error) {
+          if (error.code === '23505' && attempts < 3) {
+            return saveDraft(attempts + 1);
+          }
+          throw error;
+        }
+        
+        return consultationId;
+      } catch (err) {
+        throw err;
+      }
+    };
+
+    try {
+      await saveDraft();
+      navigate('/dashboard');
+    } catch (err: any) {
+      console.error("Error saving draft:", err);
+      alert(`Erro ao salvar rascunho: ${err.message || "Erro desconhecido"}`);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -639,14 +744,45 @@ export default function NewConsultation() {
             )}
           </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-slate-900 text-white font-bold py-4 rounded-2xl shadow-lg flex items-center justify-center gap-2 active:scale-[0.98] transition-all disabled:opacity-50"
-          >
-            {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-            Finalizar e Salvar Triagem
-          </button>
+          <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4">
+            <h2 className="font-bold text-slate-900 mb-2">Atribuição (Opcional)</h2>
+            <p className="text-sm text-slate-500 mb-4">
+              Pode atribuir este rascunho a outro médico para que ele finalize a consulta.
+            </p>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Médico Responsável</label>
+              <select
+                className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-cyan-500 outline-none bg-white"
+                value={assignedDoctor}
+                onChange={(e) => setAssignedDoctor(e.target.value)}
+              >
+                <option value="">Atribuir a mim mesmo</option>
+                {professionals.filter(p => p.id !== user?.id).map(p => (
+                  <option key={p.id} value={p.id}>Dr(a). {p.name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <button
+              type="button"
+              onClick={handleSaveDraft}
+              disabled={loading}
+              className="w-full bg-slate-100 text-slate-700 font-bold py-4 rounded-2xl shadow-sm flex items-center justify-center gap-2 hover:bg-slate-200 active:scale-[0.98] transition-all disabled:opacity-50"
+            >
+              {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+              Guardar como Rascunho
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-slate-900 text-white font-bold py-4 rounded-2xl shadow-lg flex items-center justify-center gap-2 active:scale-[0.98] transition-all disabled:opacity-50"
+            >
+              {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+              Finalizar e Salvar Triagem
+            </button>
+          </div>
         </form>
       </main>
     </div>

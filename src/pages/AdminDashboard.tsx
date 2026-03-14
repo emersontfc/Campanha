@@ -108,20 +108,21 @@ export default function AdminDashboard() {
 
       // Calculate Stats
       if (consultationData) {
-        const total = consultationData.length;
-        const hypertension = consultationData.filter(c => c.systolic >= 140 || c.diastolic >= 90).length;
-        const diabetes = consultationData.filter(c => c.glucose >= 7.0).length;
+        const completedConsultations = consultationData.filter(c => c.status === 'completed');
+        const total = completedConsultations.length;
+        const hypertension = completedConsultations.filter(c => c.systolic >= 140 || c.diastolic >= 90).length;
+        const diabetes = completedConsultations.filter(c => c.glucose >= 7.0).length;
         
         const bmiDist = {
-          underweight: consultationData.filter(c => c.bmi < 18.5).length,
-          normal: consultationData.filter(c => c.bmi >= 18.5 && c.bmi < 25).length,
-          overweight: consultationData.filter(c => c.bmi >= 25 && c.bmi < 30).length,
-          obese: consultationData.filter(c => c.bmi >= 30).length,
+          underweight: completedConsultations.filter(c => c.bmi < 18.5).length,
+          normal: completedConsultations.filter(c => c.bmi >= 18.5 && c.bmi < 25).length,
+          overweight: completedConsultations.filter(c => c.bmi >= 25 && c.bmi < 30).length,
+          obese: completedConsultations.filter(c => c.bmi >= 30).length,
         };
 
         const campaignCounts = (campaignData || []).map(camp => ({
           campaign_name: camp.name,
-          count: consultationData.filter(c => c.campaign_id === camp.id).length
+          count: completedConsultations.filter(c => c.campaign_id === camp.id).length
         })).filter(c => c.count > 0);
 
         setStats({
@@ -720,9 +721,10 @@ export default function AdminDashboard() {
                               <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                                 c.status === 'completed' ? 'bg-emerald-100 text-emerald-800' :
                                 c.status === 'accepted' ? 'bg-sky-100 text-sky-800' :
+                                c.status === 'draft' ? 'bg-slate-200 text-slate-800' :
                                 'bg-amber-100 text-amber-800'
                               }`}>
-                                {c.status === 'completed' ? 'Concluída' : c.status === 'accepted' ? 'Em Andamento' : 'Pendente'}
+                                {c.status === 'completed' ? 'Concluída' : c.status === 'accepted' ? 'Em Andamento' : c.status === 'draft' ? 'Rascunho' : 'Pendente'}
                               </span>
                             </td>
                           </tr>
@@ -929,16 +931,25 @@ export default function AdminDashboard() {
                             {stats?.screenings_by_campaign.find(s => s.campaign_name === c.name)?.count || 0}
                           </p>
                         </div>
-                        <button 
-                          onClick={() => toggleCampaignStatus(c.id, c.active)}
-                          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                            c.active 
-                              ? 'bg-slate-100 text-slate-700 hover:bg-slate-200' 
-                              : 'bg-sky-50 text-sky-700 hover:bg-sky-100'
-                          }`}
-                        >
-                          {c.active ? 'Encerrar' : 'Reativar'}
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button 
+                            onClick={() => navigate(`/campaign-report/${c.id}`)}
+                            className="px-4 py-2 rounded-lg text-sm font-medium bg-cyan-50 text-cyan-700 hover:bg-cyan-100 transition-colors flex items-center gap-1.5"
+                          >
+                            <FileText className="w-4 h-4" />
+                            <span className="hidden sm:inline">Relatório</span>
+                          </button>
+                          <button 
+                            onClick={() => toggleCampaignStatus(c.id, c.active)}
+                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                              c.active 
+                                ? 'bg-slate-100 text-slate-700 hover:bg-slate-200' 
+                                : 'bg-slate-800 text-white hover:bg-slate-900'
+                            }`}
+                          >
+                            {c.active ? 'Encerrar' : 'Reativar'}
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -1019,9 +1030,10 @@ export default function AdminDashboard() {
                               <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
                                 c.status === 'completed' ? 'bg-emerald-100 text-emerald-800' :
                                 c.status === 'accepted' ? 'bg-sky-100 text-sky-800' :
+                                c.status === 'draft' ? 'bg-slate-200 text-slate-800' :
                                 'bg-amber-100 text-amber-800'
                               }`}>
-                                {c.status === 'completed' ? 'Concluída' : c.status === 'accepted' ? 'Em Andamento' : 'Pendente'}
+                                {c.status === 'completed' ? 'Concluída' : c.status === 'accepted' ? 'Em Andamento' : c.status === 'draft' ? 'Rascunho' : 'Pendente'}
                               </span>
                             </td>
                             <td className="px-6 py-4 text-right">

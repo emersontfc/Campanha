@@ -12,6 +12,7 @@ export default function Dashboard() {
   const [recentConsultations, setRecentConsultations] = useState<any[]>([]);
   const [pendingRequests, setPendingRequests] = useState<any[]>([]);
   const [acceptedRequests, setAcceptedRequests] = useState<any[]>([]);
+  const [drafts, setDrafts] = useState<any[]>([]);
   const [isOnline, setIsOnline] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -76,6 +77,16 @@ export default function Dashboard() {
           .order('created_at', { ascending: false });
         
         setAcceptedRequests(accepted || []);
+
+        // Fetch drafts assigned to this doctor
+        const { data: doctorDrafts } = await supabase
+          .from('consultations')
+          .select('*')
+          .eq('professional_id', user.id)
+          .eq('status', 'draft')
+          .order('created_at', { ascending: false });
+        
+        setDrafts(doctorDrafts || []);
       } catch (error) {
         console.error("Error fetching consultations:", error);
       }
@@ -149,6 +160,8 @@ export default function Dashboard() {
       }
       
       setRecentConsultations(prev => prev.filter(c => c.id !== id));
+      setDrafts(prev => prev.filter(c => c.id !== id));
+      setAcceptedRequests(prev => prev.filter(c => c.id !== id));
       setStats(prev => ({ ...prev, total: Math.max(0, prev.total - 1) }));
       alert("Consulta eliminada com sucesso.");
     } catch (error: any) {
@@ -290,6 +303,60 @@ export default function Dashboard() {
             )}
           </div>
         </div>
+
+        {drafts.length > 0 && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between px-1">
+              <h2 className="font-bold text-slate-900">Rascunhos</h2>
+              <span className="bg-slate-200 text-slate-700 text-[10px] font-bold px-2 py-1 rounded-full uppercase">
+                {drafts.length}
+              </span>
+            </div>
+            <div className="space-y-3">
+              {drafts.map((d) => (
+                <div
+                  key={d.id}
+                  className="block bg-white p-5 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all"
+                >
+                  <div className="flex justify-between items-start mb-3">
+                    <div className="cursor-pointer" onClick={() => navigate(`/edit-consultation?id=${d.consultation_id}`)}>
+                      <h3 className="font-bold text-slate-900 text-lg hover:text-cyan-600 transition-colors">{d.patient_name}</h3>
+                      <p className="text-sm text-slate-500">{d.patient_age} anos • {d.patient_sex === 'M' ? 'Masculino' : 'Feminino'}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="bg-slate-100 text-slate-600 text-xs font-bold px-2 py-1 rounded-lg">
+                        Rascunho
+                      </span>
+                      <button
+                        onClick={(e) => handleDeleteConsultation(e, d.id)}
+                        disabled={deletingId === d.id}
+                        className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Eliminar Rascunho"
+                      >
+                        {deletingId === d.id ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-4 h-4" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between mt-4">
+                    <span className="text-xs text-slate-400">
+                      {new Date(d.created_at).toLocaleDateString()}
+                    </span>
+                    <button 
+                      onClick={() => navigate(`/edit-consultation?id=${d.consultation_id}`)}
+                      className="text-cyan-600 text-sm font-bold flex items-center gap-1 hover:text-cyan-700 transition-colors"
+                    >
+                      Continuar <Edit2 className="w-3 h-3" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {acceptedRequests.length > 0 && (
           <div className="space-y-3">

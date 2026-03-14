@@ -58,6 +58,7 @@ export default function PatientPortal() {
             .from('consultations')
             .select('*')
             .eq('patient_name', consultationData.patient_name)
+            .eq('status', 'completed')
             .neq('consultation_id', id)
             .order('created_at', { ascending: false })
             .limit(3);
@@ -296,7 +297,7 @@ export default function PatientPortal() {
     );
   }
 
-  if (consultation.status === 'accepted') {
+  if (consultation.status === 'accepted' || consultation.status === 'draft') {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4 text-center">
         <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mb-6">

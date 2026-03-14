@@ -43,7 +43,7 @@ export interface Consultation {
   cvd_risk_score?: number;
   physical_examination?: string;
   ai_analysis: string;
-  status?: 'pending' | 'accepted' | 'completed';
+  status?: 'pending' | 'accepted' | 'completed' | 'draft';
   room_number?: string;
   created_at: string;
 }

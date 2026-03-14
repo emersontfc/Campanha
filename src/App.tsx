@@ -9,6 +9,7 @@ import NewConsultation from "./pages/NewConsultation";
 import PatientPortal from "./pages/PatientPortal";
 import EditConsultation from "./pages/EditConsultation";
 import AdminDashboard from "./pages/AdminDashboard";
+import CampaignReport from "./pages/CampaignReport";
 import PendingVerification from "./pages/PendingVerification";
 import ResetPassword from "./pages/ResetPassword";
 import { ShieldAlert } from "lucide-react";
@@ -80,6 +81,14 @@ export default function App() {
             element={
               <ProtectedRoute requireAdmin>
                 <AdminDashboard />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/campaign-report/:id" 
+            element={
+              <ProtectedRoute requireAdmin>
+                <CampaignReport />
               </ProtectedRoute>
             } 
           />
