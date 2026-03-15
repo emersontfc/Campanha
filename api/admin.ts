@@ -107,11 +107,14 @@ export default async function handler(req: any, res: any) {
     // Default: Generate recovery link
     if (!email) return res.status(400).json({ error: "Email é obrigatório" });
     
+    // Use APP_URL from environment if available, otherwise fallback to headers
+    const baseUrl = process.env.APP_URL || `${req.headers['x-forwarded-proto'] || 'https'}://${req.headers.host}`;
+    
     const { data, error } = await supabaseAdmin.auth.admin.generateLink({
       type: 'recovery',
       email: email,
       options: {
-        redirectTo: `${req.headers['x-forwarded-proto'] || 'https'}://${req.headers.host}/reset-password`
+        redirectTo: `${baseUrl}/reset-password`
       }
     });
 

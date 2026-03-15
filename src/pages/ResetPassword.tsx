@@ -17,13 +17,32 @@ export default function ResetPassword() {
   useEffect(() => {
     // Check if we have a recovery session
     const checkSession = async () => {
+      // First check immediate session
       const { data: { session } } = await supabase.auth.getSession();
-      // Supabase sets a session when clicking a recovery link
       if (session) {
         setIsSessionValid(true);
-      } else {
-        setIsSessionValid(false);
+        return;
       }
+
+      // If no immediate session, listen for a short period for auth changes
+      // (Supabase sometimes takes a moment to process the hash)
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+        if (session && (event === 'SIGNED_IN' || event === 'PASSWORD_RECOVERY')) {
+          setIsSessionValid(true);
+        }
+      });
+
+      // Timeout after 3 seconds if no session is found
+      const timer = setTimeout(() => {
+        if (isSessionValid === null) {
+          setIsSessionValid(false);
+        }
+      }, 3000);
+
+      return () => {
+        subscription.unsubscribe();
+        clearTimeout(timer);
+      };
     };
     checkSession();
   }, []);
