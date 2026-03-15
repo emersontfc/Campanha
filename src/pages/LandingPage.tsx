@@ -5,21 +5,23 @@ import { supabase } from "../lib/supabase";
 import { motion } from "framer-motion";
 import { 
   HeartPulse, ShieldCheck, Users, Activity, 
-  ArrowRight, Globe, CheckCircle2, Sparkles 
+  ArrowRight, Globe, CheckCircle2, Sparkles
 } from "lucide-react";
+import { AnimatePresence } from "framer-motion";
 
 export default function LandingPage() {
   const navigate = useNavigate();
   const [campaignPhotos, setCampaignPhotos] = useState<any[]>([]);
+  const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
 
   useEffect(() => {
     const fetchPhotos = async () => {
       const { data } = await supabase
         .from('knowledge_base')
         .select('*')
-        .like('name', 'campaign_photo_%')
+        .or('name.ilike.campaign_photo_%,name.ilike.cphv2|%')
         .order('created_at', { ascending: false })
-        .limit(6);
+        .limit(10);
       
       if (data) {
         setCampaignPhotos(data);
@@ -27,6 +29,21 @@ export default function LandingPage() {
     };
     fetchPhotos();
   }, []);
+
+  const nextPhoto = () => {
+    setCurrentPhotoIndex((prev) => (prev + 1) % campaignPhotos.length);
+  };
+
+  // Auto-play effect
+  useEffect(() => {
+    if (campaignPhotos.length <= 1) return;
+
+    const timer = setTimeout(() => {
+      nextPhoto();
+    }, 5000); // Muda a cada 5 segundos
+
+    return () => clearTimeout(timer);
+  }, [currentPhotoIndex, campaignPhotos.length]);
 
   return (
     <div className="min-h-screen bg-white font-sans selection:bg-cyan-100 selection:text-cyan-900">
@@ -159,52 +176,86 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Campaign Photos Section */}
+      {/* Campaign Photos Slider */}
       {campaignPhotos.length > 0 && (
-        <section className="py-12 sm:py-20 bg-slate-50 px-4 sm:px-6 border-t border-slate-100">
-          <div className="max-w-7xl mx-auto">
-            <div className="text-center max-w-3xl mx-auto mb-12 sm:mb-16 space-y-4">
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-sky-50 text-sky-700 rounded-full text-[10px] sm:text-xs font-black uppercase tracking-widest border border-sky-100">
-                <Sparkles className="w-3 h-3" />
-                Em Destaque
+        <section className="py-12 sm:py-20 bg-slate-50 overflow-hidden border-t border-slate-100">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6">
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12 sm:mb-16 text-center md:text-left">
+              <div className="space-y-4 mx-auto md:mx-0">
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-sky-50 text-sky-700 rounded-full text-[10px] sm:text-xs font-black uppercase tracking-widest border border-sky-100">
+                  <Sparkles className="w-3 h-3" />
+                  Impacto Real
+                </div>
+                <h2 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight">Nossas Campanhas em Campo</h2>
+                <p className="text-slate-500 font-medium max-w-xl">
+                  Veja os momentos das nossas missões de saúde levadas às comunidades mais remotas de Moçambique.
+                </p>
               </div>
-              <h2 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight">As Nossas Campanhas</h2>
-              <p className="text-base sm:text-lg text-slate-500 font-medium px-4">
-                Veja o impacto das nossas iniciativas de saúde nas comunidades de Moçambique.
-              </p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
-              {campaignPhotos.map((photo, i) => {
-                // Extract campaign ID from filename (format: campaign_photo_{id}_{timestamp}.png)
-                const match = photo.name.match(/campaign_photo_(.*?)_\d+\.png/);
-                const campId = match ? match[1] : null;
-                // We don't have the campaign name here directly, but we can just show the date
-                
-                return (
-                  <motion.div 
-                    key={photo.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ duration: 0.5, delay: i * 0.1 }}
-                    className="group relative rounded-[2rem] overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 bg-white"
-                  >
-                    <div className="aspect-[4/3] w-full overflow-hidden bg-slate-100">
-                      <img 
-                        src={photo.file_url} 
-                        alt="Campanha Al-Shifa" 
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                        referrerPolicy="no-referrer"
-                      />
-                    </div>
-                    <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-slate-900/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-6">
-                      <p className="text-white font-bold text-lg">Campanha de Triagem</p>
-                      <p className="text-cyan-300 text-sm font-medium">{new Date(photo.created_at).toLocaleDateString('pt-PT', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-                    </div>
-                  </motion.div>
-                );
-              })}
+            <div className="relative h-[400px] sm:h-[600px] rounded-[2.5rem] sm:rounded-[4rem] overflow-hidden shadow-2xl">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={currentPhotoIndex}
+                  initial={{ opacity: 0, scale: 1.1 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  transition={{ duration: 0.8, ease: "easeOut" }}
+                  className="absolute inset-0"
+                >
+                  <img 
+                    src={campaignPhotos[currentPhotoIndex].file_url} 
+                    alt="Campanha Al-Shifa" 
+                    className="w-full h-full object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/20 to-transparent opacity-80" />
+                  
+                  <div className="absolute bottom-0 left-0 right-0 p-8 sm:p-16 space-y-4">
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.3 }}
+                    >
+                      {(() => {
+                        const photo = campaignPhotos[currentPhotoIndex];
+                        let displayTitle = "Campanha de Triagem";
+                        let displayDate = photo.created_at;
+
+                        if (photo.name.startsWith('cphv2|')) {
+                          const parts = photo.name.split('|');
+                          displayTitle = parts[2] || displayTitle;
+                          displayDate = parts[3] || displayDate;
+                        }
+
+                        return (
+                          <>
+                            <h3 className="text-3xl sm:text-5xl font-black text-white tracking-tight mb-2">
+                              {displayTitle}
+                            </h3>
+                            <p className="text-cyan-400 font-bold text-lg sm:text-xl">
+                              {new Date(displayDate).toLocaleDateString('pt-PT', { day: 'numeric', month: 'long', year: 'numeric' })}
+                            </p>
+                          </>
+                        );
+                      })()}
+                    </motion.div>
+                  </div>
+                </motion.div>
+              </AnimatePresence>
+
+              {/* Progress Indicators */}
+              <div className="absolute bottom-8 right-8 sm:bottom-16 sm:right-16 flex gap-2">
+                {campaignPhotos.map((_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setCurrentPhotoIndex(i)}
+                    className={`h-1.5 rounded-full transition-all duration-300 ${
+                      i === currentPhotoIndex ? 'w-8 bg-cyan-400' : 'w-2 bg-white/30 hover:bg-white/50'
+                    }`}
+                  />
+                ))}
+              </div>
             </div>
           </div>
         </section>
