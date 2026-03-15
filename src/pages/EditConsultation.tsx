@@ -144,6 +144,15 @@ export default function EditConsultation() {
     fetchData();
   }, [id]);
 
+  const handleWhatsAppShare = () => {
+    if (!id) return;
+    const reportUrl = `${window.location.origin}/patient?id=${id}`;
+    const text = `*Relatório de Saúde Al-Shifa*\n\nOlá! Aqui está o seu relatório de saúde (ID: ${id}).\n\nVeja os detalhes completos aqui:\n${reportUrl}`;
+    const phone = formData.patientPhone?.replace(/\D/g, "") || "";
+    const url = `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
+    window.open(url, "_blank");
+  };
+
   const handleGenerateAI = async () => {
     let finalSystolic = Number(formData.systolic);
     let finalDiastolic = Number(formData.diastolic);
@@ -447,6 +456,14 @@ export default function EditConsultation() {
           <h1 className="font-bold text-slate-900">Completar Triagem</h1>
           
           <div className="ml-auto flex items-center gap-2">
+            <button 
+              type="button"
+              onClick={handleWhatsAppShare}
+              className="flex items-center gap-2 px-4 py-2 bg-emerald-50 border border-emerald-100 text-emerald-600 rounded-xl font-bold text-xs hover:bg-emerald-100 transition-all active:scale-[0.98]"
+            >
+              <Send className="w-4 h-4" />
+              WhatsApp
+            </button>
             <button 
               type="button"
               onClick={() => setShowTransferModal(true)}
