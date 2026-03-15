@@ -86,7 +86,7 @@ export default function PatientPortal() {
   const handleShare = () => {
     if (!id) return;
     
-    const reportUrl = `${window.location.origin}/#/patient?id=${id}`;
+    const reportUrl = `${window.location.origin}/patient?id=${id}`;
     const text = `*Relatório de Saúde Al-Shifa*\n\nOlá! Aqui está o seu relatório de saúde (ID: ${id}).\n\nVeja os detalhes completos aqui:\n${reportUrl}`;
     
     const phone = consultation?.patient_phone?.replace(/\D/g, "") || "";

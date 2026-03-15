@@ -111,7 +111,7 @@ export default async function handler(req: any, res: any) {
       type: 'recovery',
       email: email,
       options: {
-        redirectTo: `${req.headers['x-forwarded-proto'] || 'https'}://${req.headers.host}/#/reset-password`
+        redirectTo: `${req.headers['x-forwarded-proto'] || 'https'}://${req.headers.host}/reset-password`
       }
     });
 

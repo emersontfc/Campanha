@@ -269,7 +269,7 @@ export default function AdminDashboard() {
       } else {
         // Fallback to standard email reset if no phone is provided
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: `${window.location.origin}/#/reset-password`,
+          redirectTo: `${window.location.origin}/reset-password`,
         });
         if (error) throw error;
         alert(`Instruções de redefinição enviadas para o email ${email}.`);

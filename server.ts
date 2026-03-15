@@ -121,7 +121,7 @@ async function startServer() {
 
       if (action === 'generate-link' || (!action && email)) {
         const { data, error } = await supabaseAdmin.auth.admin.generateLink({
-          type: 'recovery', email, options: { redirectTo: `${req.headers.origin}/#/reset-password` }
+          type: 'recovery', email, options: { redirectTo: `${req.headers.origin}/reset-password` }
         });
         if (error) throw error;
         return res.json({ link: data.properties.action_link });

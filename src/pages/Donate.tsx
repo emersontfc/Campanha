@@ -186,7 +186,7 @@ export default function Donate() {
               </p>
               <div className="flex flex-wrap gap-4">
                 <a 
-                  href="mailto:contato@alshifa.org" 
+                  href="mailto:emersontorres42@gmail.com" 
                   className="px-6 py-3 bg-white text-sky-900 rounded-xl font-bold hover:bg-sky-50 transition-colors inline-flex items-center gap-2"
                 >
                   Contactar por Email
