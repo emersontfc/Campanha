@@ -161,16 +161,18 @@ async function startServer() {
     });
   } else {
     // Serve static files in production
-    const distPath = path.join(process.cwd(), "dist");
-    console.log(`[Server] Serving static files from: ${distPath}`);
+    const distPath = path.resolve(__dirname, "dist");
+    console.log(`[Server] Production mode. Serving from: ${distPath}`);
     
+    // Serve static assets
     app.use(express.static(distPath));
     
+    // SPA Fallback: All non-API routes serve index.html
     app.get("*", (req, res) => {
       const url = req.originalUrl || req.url;
-      console.log(`[Server] Catch-all route hit for: ${url}`);
+      console.log(`[Server] Request: ${url}`);
 
-      // Skip API routes
+      // Skip API
       if (url.startsWith("/api")) {
         return res.status(404).json({ error: "API route not found" });
       }
@@ -179,8 +181,8 @@ async function startServer() {
       if (fs.existsSync(indexPath)) {
         res.sendFile(indexPath);
       } else {
-        console.error(`[Server] index.html not found at: ${indexPath}`);
-        res.status(404).send("Application index.html not found");
+        console.error(`[Server] Critical: index.html not found at ${indexPath}`);
+        res.status(404).send("Application files not found. Please rebuild.");
       }
     });
   }
