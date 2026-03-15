@@ -8,7 +8,7 @@ import {
   TrendingUp, Users, Activity, MapPin, Plus, Sparkles,
   LayoutDashboard, Settings, MoreVertical, Edit2, Key, Trash2,
   Menu, X, Bell, FileText, CheckCircle2, AlertCircle, Clock, RefreshCw,
-  BookOpen, Image
+  BookOpen, Image, Heart, Smartphone
 } from "lucide-react";
 import { VerifiedBadge } from "../components/VerifiedBadge";
 import { useNavigate } from "react-router-dom";
@@ -23,7 +23,7 @@ const COLORS = ['#0ea5e9', '#38bdf8', '#7dd3fc', '#bae6fd', '#e0f2fe'];
 
 export default function AdminDashboard() {
   const { profile } = useAuth();
-  const [activeTab, setActiveTab] = useState<"overview" | "campaigns" | "users" | "consultations" | "knowledge" | "photos">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "campaigns" | "users" | "consultations" | "knowledge" | "photos" | "settings">("overview");
   const [users, setUsers] = useState<any[]>([]);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [consultations, setConsultations] = useState<any[]>([]);
@@ -32,6 +32,15 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [donationSettings, setDonationSettings] = useState({
+    mpesa_number: "",
+    mpesa_name: "",
+    emola_number: "",
+    emola_name: "",
+    donation_title: "",
+    donation_description: ""
+  });
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
   
   // UI State
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -112,6 +121,17 @@ export default function AdminDashboard() {
       if (!kbError && kbData) {
         setKnowledgeBase(kbData.filter(item => !item.name.startsWith('campaign_photo_') && !item.name.startsWith('cphv2|')));
         setCampaignPhotos(kbData.filter(item => item.name.startsWith('campaign_photo_') || item.name.startsWith('cphv2|')));
+      }
+
+      // Fetch Donation Settings
+      const { data: settingsData } = await supabase
+        .from('site_settings')
+        .select('value')
+        .eq('key', 'donation_info')
+        .single();
+      
+      if (settingsData) {
+        setDonationSettings(settingsData.value);
       }
 
       // Calculate Stats
@@ -540,6 +560,27 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleSaveDonationSettings = async () => {
+    setIsSavingSettings(true);
+    try {
+      const { error } = await supabase
+        .from('site_settings')
+        .upsert({
+          key: 'donation_info',
+          value: donationSettings,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'key' });
+
+      if (error) throw error;
+      alert("Configurações de doação guardadas com sucesso!");
+    } catch (err: any) {
+      console.error("Error saving settings:", err);
+      alert(`Erro ao guardar configurações: ${err.message}`);
+    } finally {
+      setIsSavingSettings(false);
+    }
+  };
+
   const handleDeleteKB = async (id: string, filePath: string) => {
     if (!window.confirm("Tem a certeza que deseja remover este documento da base de conhecimento?")) return;
 
@@ -649,6 +690,7 @@ export default function AdminDashboard() {
           <NavItem icon={FileText} label="Consultas" id="consultations" />
           <NavItem icon={BookOpen} label="Base de Conhecimento" id="knowledge" />
           <NavItem icon={Image} label="Publicidade & Fotos" id="photos" />
+          <NavItem icon={Settings} label="Configurações" id="settings" />
           
           <div className="pt-8 pb-2">
             <p className="px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Sistema</p>
@@ -1315,6 +1357,129 @@ export default function AdminDashboard() {
                       <p className="text-slate-500">Nenhuma foto de campanha adicionada.</p>
                     </div>
                   )}
+                </div>
+              </motion.div>
+            )}
+
+            {/* SETTINGS TAB */}
+            {activeTab === "settings" && (
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 max-w-4xl">
+                <div>
+                  <h2 className="text-2xl font-bold text-slate-800">Configurações do Sistema</h2>
+                  <p className="text-slate-500 text-sm">Configure os detalhes da página de doações e outras preferências do site.</p>
+                </div>
+
+                <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
+                  <div className="p-6 border-b border-slate-100 bg-slate-50/50">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center text-red-600">
+                        <Heart className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-bold text-slate-900">Página de Doações</h3>
+                        <p className="text-sm text-slate-500">Configure os contactos para M-Pesa e e-Mola.</p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="p-8 space-y-8">
+                    {/* General Info */}
+                    <div className="grid grid-cols-1 gap-6">
+                      <div className="space-y-2">
+                        <label className="text-sm font-semibold text-slate-700">Título da Página</label>
+                        <input 
+                          type="text"
+                          value={donationSettings.donation_title}
+                          onChange={(e) => setDonationSettings({...donationSettings, donation_title: e.target.value})}
+                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none transition-all"
+                          placeholder="Ex: Apoie a Nossa Causa"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-semibold text-slate-700">Descrição/Mensagem</label>
+                        <textarea 
+                          rows={3}
+                          value={donationSettings.donation_description}
+                          onChange={(e) => setDonationSettings({...donationSettings, donation_description: e.target.value})}
+                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none transition-all resize-none"
+                          placeholder="Explique como as doações ajudam..."
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                      {/* M-Pesa Settings */}
+                      <div className="space-y-6 p-6 bg-red-50/30 rounded-2xl border border-red-100">
+                        <div className="flex items-center gap-2 text-red-600 mb-2">
+                          <Smartphone className="w-5 h-5" />
+                          <span className="font-bold uppercase tracking-wider text-sm">M-Pesa</span>
+                        </div>
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <label className="text-xs font-bold text-slate-500 uppercase">Número M-Pesa</label>
+                            <input 
+                              type="text"
+                              value={donationSettings.mpesa_number}
+                              onChange={(e) => setDonationSettings({...donationSettings, mpesa_number: e.target.value})}
+                              className="w-full px-4 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-red-500 outline-none"
+                              placeholder="84XXXXXXX"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-xs font-bold text-slate-500 uppercase">Nome da Conta</label>
+                            <input 
+                              type="text"
+                              value={donationSettings.mpesa_name}
+                              onChange={(e) => setDonationSettings({...donationSettings, mpesa_name: e.target.value})}
+                              className="w-full px-4 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-red-500 outline-none"
+                              placeholder="Nome do Titular"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* e-Mola Settings */}
+                      <div className="space-y-6 p-6 bg-orange-50/30 rounded-2xl border border-orange-100">
+                        <div className="flex items-center gap-2 text-orange-600 mb-2">
+                          <Smartphone className="w-5 h-5" />
+                          <span className="font-bold uppercase tracking-wider text-sm">e-Mola</span>
+                        </div>
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <label className="text-xs font-bold text-slate-500 uppercase">Número e-Mola</label>
+                            <input 
+                              type="text"
+                              value={donationSettings.emola_number}
+                              onChange={(e) => setDonationSettings({...donationSettings, emola_number: e.target.value})}
+                              className="w-full px-4 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none"
+                              placeholder="86XXXXXXX"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-xs font-bold text-slate-500 uppercase">Nome da Conta</label>
+                            <input 
+                              type="text"
+                              value={donationSettings.emola_name}
+                              onChange={(e) => setDonationSettings({...donationSettings, emola_name: e.target.value})}
+                              className="w-full px-4 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none"
+                              placeholder="Nome do Titular"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end pt-4">
+                      <button 
+                        onClick={handleSaveDonationSettings}
+                        disabled={isSavingSettings}
+                        className="flex items-center gap-2 px-8 py-3 bg-sky-600 text-white rounded-xl font-bold hover:bg-sky-700 transition-all shadow-lg shadow-sky-200 disabled:opacity-50"
+                      >
+                        {isSavingSettings ? <RefreshCw className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
+                        {isSavingSettings ? "Guardando..." : "Guardar Alterações"}
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </motion.div>
             )}

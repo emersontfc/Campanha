@@ -12,6 +12,7 @@ import AdminDashboard from "./pages/AdminDashboard";
 import CampaignReport from "./pages/CampaignReport";
 import PendingVerification from "./pages/PendingVerification";
 import ResetPassword from "./pages/ResetPassword";
+import Donate from "./pages/Donate";
 import { ShieldAlert } from "lucide-react";
 
 function ConfigError() {
@@ -76,6 +77,7 @@ export default function App() {
             } 
           />
           <Route path="/patient" element={<PatientPortal />} />
+          <Route path="/donate" element={<Donate />} />
           <Route 
             path="/admin" 
             element={

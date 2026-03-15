@@ -41,6 +41,13 @@ export default function LandingPage() {
           </div>
           <div className="flex items-center gap-2 sm:gap-4">
             <button 
+              onClick={() => navigate("/donate")}
+              className="hidden sm:flex items-center gap-2 px-4 py-2 text-sm font-bold text-red-600 hover:bg-red-50 rounded-xl transition-colors"
+            >
+              <HeartPulse className="w-4 h-4" />
+              Apoiar Causa
+            </button>
+            <button 
               onClick={() => navigate("/login")}
               className="px-3 sm:px-6 py-2 text-xs sm:text-sm font-bold text-slate-600 hover:text-cyan-600 transition-colors"
             >
@@ -88,6 +95,12 @@ export default function LandingPage() {
                 className="px-6 sm:px-8 py-4 sm:py-5 bg-white border-2 border-slate-100 text-slate-900 rounded-xl sm:rounded-2xl font-black text-base sm:text-lg hover:bg-slate-50 transition-all flex items-center justify-center gap-3"
               >
                 Portal do Paciente
+              </button>
+              <button 
+                onClick={() => navigate("/donate")}
+                className="px-6 sm:px-8 py-4 sm:py-5 bg-red-50 text-red-600 rounded-xl sm:rounded-2xl font-black text-base sm:text-lg hover:bg-red-100 transition-all flex items-center justify-center gap-3 border-2 border-red-100 sm:hidden"
+              >
+                Apoiar Causa
               </button>
             </div>
             <div className="flex items-center justify-center lg:justify-start gap-4 sm:gap-8 pt-8 border-t border-slate-100">
@@ -311,6 +324,7 @@ export default function LandingPage() {
             © 2026 Iniciativa de Saúde Al-Shifa Moçambique.
           </p>
           <div className="flex items-center gap-4 sm:gap-6">
+            <button onClick={() => navigate("/donate")} className="text-red-500 hover:text-red-600 transition-colors text-[10px] sm:text-sm font-bold">Doar</button>
             <a href="#" className="text-slate-400 hover:text-slate-900 transition-colors text-[10px] sm:text-sm font-bold">Privacidade</a>
             <a href="#" className="text-slate-400 hover:text-slate-900 transition-colors text-[10px] sm:text-sm font-bold">Termos</a>
           </div>
