@@ -8,7 +8,7 @@ import {
   TrendingUp, Users, Activity, MapPin, Plus, Sparkles,
   LayoutDashboard, Settings, MoreVertical, Edit2, Key, Trash2,
   Menu, X, Bell, FileText, CheckCircle2, AlertCircle, Clock, RefreshCw,
-  BookOpen
+  BookOpen, Image
 } from "lucide-react";
 import { VerifiedBadge } from "../components/VerifiedBadge";
 import { useNavigate } from "react-router-dom";
@@ -23,11 +23,12 @@ const COLORS = ['#0ea5e9', '#38bdf8', '#7dd3fc', '#bae6fd', '#e0f2fe'];
 
 export default function AdminDashboard() {
   const { profile } = useAuth();
-  const [activeTab, setActiveTab] = useState<"overview" | "campaigns" | "users" | "consultations" | "knowledge">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "campaigns" | "users" | "consultations" | "knowledge" | "photos">("overview");
   const [users, setUsers] = useState<any[]>([]);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [consultations, setConsultations] = useState<any[]>([]);
   const [knowledgeBase, setKnowledgeBase] = useState<any[]>([]);
+  const [campaignPhotos, setCampaignPhotos] = useState<any[]>([]);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -38,6 +39,10 @@ export default function AdminDashboard() {
   const [newCampaign, setNewCampaign] = useState({ name: "", location: "" });
   const [isCreatingCampaign, setIsCreatingCampaign] = useState(false);
   const [isUploadingKB, setIsUploadingKB] = useState(false);
+  const [isStylizingPhoto, setIsStylizingPhoto] = useState(false);
+  const [selectedCampaignForPhoto, setSelectedCampaignForPhoto] = useState("");
+  const [photoTitle, setPhotoTitle] = useState("");
+  const [photoDate, setPhotoDate] = useState(new Date().toISOString().split('T')[0]);
 
   // User Management State
   const [editingUser, setEditingUser] = useState<any | null>(null);
@@ -98,13 +103,16 @@ export default function AdminDashboard() {
       
       setConsultations(consultationsWithCampaigns);
 
-      // Fetch Knowledge Base
+      // Fetch Knowledge Base and Photos
       const { data: kbData, error: kbError } = await supabase
         .from('knowledge_base')
         .select('*')
         .order('created_at', { ascending: false });
       
-      if (!kbError) setKnowledgeBase(kbData || []);
+      if (!kbError && kbData) {
+        setKnowledgeBase(kbData.filter(item => !item.name.startsWith('campaign_photo_') && !item.name.startsWith('cphv2|')));
+        setCampaignPhotos(kbData.filter(item => item.name.startsWith('campaign_photo_') || item.name.startsWith('cphv2|')));
+      }
 
       // Calculate Stats
       if (consultationData) {
@@ -400,6 +408,79 @@ export default function AdminDashboard() {
     link.remove();
   };
 
+  const handleUploadCampaignPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      alert("Por favor, carregue apenas imagens.");
+      return;
+    }
+
+    if (!selectedCampaignForPhoto) {
+      alert("Por favor, selecione uma campanha primeiro.");
+      return;
+    }
+
+    setIsStylizingPhoto(true);
+    try {
+      // Use a structured name to store metadata: cphv2|campaignId|title|date|timestamp|filename
+      const timestamp = Date.now();
+      const safeTitle = photoTitle.replace(/\|/g, '-'); // Avoid separator conflict
+      const safeFileName = file.name.replace(/\|/g, '-');
+      const dbName = `cphv2|${selectedCampaignForPhoto}|${safeTitle}|${photoDate}|${timestamp}|${safeFileName}`;
+      
+      const storageFileName = `campaign_photo_${selectedCampaignForPhoto}_${timestamp}_${file.name}`;
+      const filePath = `knowledge-base/${storageFileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('knowledge-base')
+        .upload(filePath, file, {
+          contentType: file.type,
+          upsert: true
+        });
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('knowledge-base')
+        .getPublicUrl(filePath);
+
+      // Save to database
+      const { error: dbError } = await supabase
+        .from('knowledge_base')
+        .insert([{
+          name: dbName,
+          file_path: filePath,
+          file_url: publicUrl
+        }]);
+
+      if (dbError) {
+        await supabase.storage.from('knowledge-base').remove([filePath]);
+        throw dbError;
+      }
+
+      // Refresh list
+      const { data: kbData } = await supabase
+        .from('knowledge_base')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (kbData) {
+        setKnowledgeBase(kbData.filter(item => !item.name.includes('campaign_photo_') && !item.name.startsWith('cphv2|')));
+        setCampaignPhotos(kbData.filter(item => item.name.includes('campaign_photo_') || item.name.startsWith('cphv2|')));
+      }
+      
+      setPhotoTitle(""); // Clear inputs
+      alert("Foto da campanha carregada com sucesso!");
+    } catch (err: any) {
+      console.error("Error uploading photo:", err);
+      alert(`Erro ao processar a foto: ${err.message}`);
+    } finally {
+      setIsStylizingPhoto(false);
+      e.target.value = '';
+    }
+  };
+
   const handleUploadKB = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -443,7 +524,10 @@ export default function AdminDashboard() {
         .from('knowledge_base')
         .select('*')
         .order('created_at', { ascending: false });
-      setKnowledgeBase(kbData || []);
+      if (kbData) {
+        setKnowledgeBase(kbData.filter(item => !item.name.startsWith('campaign_photo_') && !item.name.startsWith('cphv2|')));
+        setCampaignPhotos(kbData.filter(item => item.name.startsWith('campaign_photo_') || item.name.startsWith('cphv2|')));
+      }
       
       alert("Documento adicionado à base de conhecimento com sucesso!");
     } catch (err: any) {
@@ -474,6 +558,7 @@ export default function AdminDashboard() {
       if (dbError) throw dbError;
 
       setKnowledgeBase(knowledgeBase.filter(item => item.id !== id));
+      setCampaignPhotos(campaignPhotos.filter(item => item.id !== id));
       alert("Documento removido.");
     } catch (err: any) {
       console.error("Error deleting KB:", err);
@@ -563,6 +648,7 @@ export default function AdminDashboard() {
           <NavItem icon={MapPin} label="Campanhas" id="campaigns" />
           <NavItem icon={FileText} label="Consultas" id="consultations" />
           <NavItem icon={BookOpen} label="Base de Conhecimento" id="knowledge" />
+          <NavItem icon={Image} label="Publicidade & Fotos" id="photos" />
           
           <div className="pt-8 pb-2">
             <p className="px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Sistema</p>
@@ -1123,6 +1209,110 @@ export default function AdminDashboard() {
                     <div className="col-span-full py-12 text-center bg-white border border-dashed border-slate-300 rounded-2xl">
                       <BookOpen className="w-12 h-12 text-slate-300 mx-auto mb-3" />
                       <p className="text-slate-500">Nenhum documento na base de conhecimento.</p>
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            )}
+
+            {/* PHOTOS TAB */}
+            {activeTab === "photos" && (
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <h2 className="text-2xl font-bold text-slate-800">Publicidade & Fotos</h2>
+                    <p className="text-slate-500 text-sm">Adicione fotos das campanhas e deixe a IA estilizá-las para a página inicial.</p>
+                  </div>
+                  <div className="flex flex-wrap gap-3 items-center">
+                    <input
+                      type="text"
+                      placeholder="Título da Foto (Ex: Palestra sobre Nutrição)"
+                      value={photoTitle}
+                      onChange={(e) => setPhotoTitle(e.target.value)}
+                      className="px-4 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none w-full sm:w-64"
+                    />
+                    <input
+                      type="date"
+                      value={photoDate}
+                      onChange={(e) => setPhotoDate(e.target.value)}
+                      className="px-4 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none"
+                    />
+                    <select
+                      value={selectedCampaignForPhoto}
+                      onChange={(e) => setSelectedCampaignForPhoto(e.target.value)}
+                      className="px-4 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none"
+                    >
+                      <option value="">Selecione a Campanha...</option>
+                      {campaigns.map(c => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
+                    <label className={`flex items-center justify-center gap-2 px-4 py-2 text-white rounded-lg text-sm font-medium transition-colors shadow-sm ${!selectedCampaignForPhoto || isStylizingPhoto ? 'bg-slate-400 cursor-not-allowed' : 'bg-sky-600 hover:bg-sky-700 cursor-pointer'}`}>
+                      {isStylizingPhoto ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Image className="w-4 h-4" />}
+                      {isStylizingPhoto ? "Carregando..." : "Adicionar Foto"}
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        className="hidden" 
+                        onChange={handleUploadCampaignPhoto}
+                        disabled={!selectedCampaignForPhoto || isStylizingPhoto}
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {campaignPhotos.map((item) => {
+                    let campId = null;
+                    let displayTitle = "";
+                    let displayDate = item.created_at;
+
+                    if (item.name.startsWith('cphv2|')) {
+                      const parts = item.name.split('|');
+                      campId = parts[1];
+                      displayTitle = parts[2];
+                      displayDate = parts[3];
+                    } else {
+                      // Old format: campaign_photo_{id}_{timestamp}.png
+                      const match = item.name.match(/campaign_photo_(.*?)_\d+/);
+                      campId = match ? match[1] : null;
+                    }
+
+                    const campName = campaigns.find(c => c.id === campId)?.name || 'Campanha Desconhecida';
+
+                    return (
+                      <div key={item.id} className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow flex flex-col group">
+                        <div className="relative h-48 bg-slate-100 overflow-hidden">
+                          <img 
+                            src={item.file_url} 
+                            alt={displayTitle || campName} 
+                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 brightness-[0.9] contrast-[1.1] saturate-[1.2]" 
+                            referrerPolicy="no-referrer" 
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-60 group-hover:opacity-40 transition-opacity" />
+                          <button 
+                            onClick={() => handleDeleteKB(item.id, item.file_path)}
+                            className="absolute top-2 right-2 p-2 bg-white/80 backdrop-blur-sm text-slate-600 hover:text-red-600 rounded-lg hover:bg-white transition-colors shadow-sm z-10"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                        <div className="p-4">
+                          <div className="flex justify-between items-start gap-2 mb-1">
+                            <h3 className="text-lg font-bold text-slate-900 line-clamp-1">{displayTitle || campName}</h3>
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <p className="text-xs font-medium text-sky-600">{campName}</p>
+                            <p className="text-xs text-slate-500">Data: {new Date(displayDate).toLocaleDateString()}</p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {campaignPhotos.length === 0 && (
+                    <div className="col-span-full py-12 text-center bg-white border border-dashed border-slate-300 rounded-2xl">
+                      <Image className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                      <p className="text-slate-500">Nenhuma foto de campanha adicionada.</p>
                     </div>
                   )}
                 </div>

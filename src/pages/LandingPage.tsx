@@ -1,5 +1,7 @@
 import * as React from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "../lib/supabase";
 import { motion } from "framer-motion";
 import { 
   HeartPulse, ShieldCheck, Users, Activity, 
@@ -8,6 +10,23 @@ import {
 
 export default function LandingPage() {
   const navigate = useNavigate();
+  const [campaignPhotos, setCampaignPhotos] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchPhotos = async () => {
+      const { data } = await supabase
+        .from('knowledge_base')
+        .select('*')
+        .like('name', 'campaign_photo_%')
+        .order('created_at', { ascending: false })
+        .limit(6);
+      
+      if (data) {
+        setCampaignPhotos(data);
+      }
+    };
+    fetchPhotos();
+  }, []);
 
   return (
     <div className="min-h-screen bg-white font-sans selection:bg-cyan-100 selection:text-cyan-900">
@@ -127,8 +146,59 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* Campaign Photos Section */}
+      {campaignPhotos.length > 0 && (
+        <section className="py-12 sm:py-20 bg-slate-50 px-4 sm:px-6 border-t border-slate-100">
+          <div className="max-w-7xl mx-auto">
+            <div className="text-center max-w-3xl mx-auto mb-12 sm:mb-16 space-y-4">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-sky-50 text-sky-700 rounded-full text-[10px] sm:text-xs font-black uppercase tracking-widest border border-sky-100">
+                <Sparkles className="w-3 h-3" />
+                Em Destaque
+              </div>
+              <h2 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight">As Nossas Campanhas</h2>
+              <p className="text-base sm:text-lg text-slate-500 font-medium px-4">
+                Veja o impacto das nossas iniciativas de saúde nas comunidades de Moçambique.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+              {campaignPhotos.map((photo, i) => {
+                // Extract campaign ID from filename (format: campaign_photo_{id}_{timestamp}.png)
+                const match = photo.name.match(/campaign_photo_(.*?)_\d+\.png/);
+                const campId = match ? match[1] : null;
+                // We don't have the campaign name here directly, but we can just show the date
+                
+                return (
+                  <motion.div 
+                    key={photo.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 0.5, delay: i * 0.1 }}
+                    className="group relative rounded-[2rem] overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 bg-white"
+                  >
+                    <div className="aspect-[4/3] w-full overflow-hidden bg-slate-100">
+                      <img 
+                        src={photo.file_url} 
+                        alt="Campanha Al-Shifa" 
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        referrerPolicy="no-referrer"
+                      />
+                    </div>
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-slate-900/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-6">
+                      <p className="text-white font-bold text-lg">Campanha de Triagem</p>
+                      <p className="text-cyan-300 text-sm font-medium">{new Date(photo.created_at).toLocaleDateString('pt-PT', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* Features Section */}
-      <section className="py-12 sm:py-20 bg-slate-50 px-4 sm:px-6">
+      <section className="py-12 sm:py-20 bg-white px-4 sm:px-6">
         <div className="max-w-7xl mx-auto">
           <div className="text-center max-w-3xl mx-auto mb-12 sm:mb-20 space-y-4">
             <h2 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight">Tecnologia ao Serviço da Vida</h2>

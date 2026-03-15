@@ -23,12 +23,12 @@ export async function analyzeConsultation(data: {
   cvdRisk?: number;
   physicalExamination?: string;
 }) {
-  const model = "gemini-flash-latest";
+  const model = "gemini-3-flash-preview";
   
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    console.error("GEMINI_API_KEY is missing");
-    return "Erro: Chave API do Gemini não configurada. Por favor, adicione GEMINI_API_KEY nas definições do projeto (Settings > Secrets).";
+    console.error("API Key is missing");
+    return "Erro: Chave API do Gemini não configurada. Por favor, adicione uma chave nas definições do projeto.";
   }
 
   const ai = new GoogleGenAI({ apiKey });
@@ -116,6 +116,10 @@ Gere a análise clínica racionalizada baseando-se nos dados acima e nas diretri
     
     if (errorMessage.includes("API key not valid")) {
       return "Erro: A chave API do Gemini é inválida. Por favor, verifique as definições.";
+    }
+    
+    if (errorMessage.includes("permission") || error?.status === "PERMISSION_DENIED") {
+      return "Erro: A sua chave API não tem permissão para usar este modelo. Certifique-se de que a API Generative Language está ativa no seu projeto Google Cloud.";
     }
     
     if (errorMessage.includes("quota")) {
