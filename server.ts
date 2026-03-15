@@ -145,7 +145,11 @@ async function startServer() {
     app.use(vite.middlewares);
 
     // Fallback for SPA in dev
-    app.use("*", async (req, res, next) => {
+    app.get("*", async (req, res, next) => {
+      if (req.originalUrl.startsWith("/api")) {
+        return next();
+      }
+
       const url = req.originalUrl;
       try {
         const template = fs.readFileSync(path.resolve(__dirname, "index.html"), "utf-8");
@@ -157,9 +161,15 @@ async function startServer() {
     });
   } else {
     // Serve static files in production
-    app.use(express.static(path.join(__dirname, "dist")));
+    const distPath = path.resolve(__dirname, "dist");
+    app.use(express.static(distPath));
+    
     app.get("*", (req, res) => {
-      res.sendFile(path.join(__dirname, "dist", "index.html"));
+      // Skip API routes
+      if (req.originalUrl.startsWith("/api")) {
+        return res.status(404).json({ error: "API route not found" });
+      }
+      res.sendFile(path.join(distPath, "index.html"));
     });
   }
 
