@@ -78,16 +78,26 @@ export default function NewConsultation() {
 
   useEffect(() => {
     const fetchPrevious = async () => {
-      if (formData.patientName.length < 3) {
+      if (formData.patientName.length < 3 && formData.patientPhone.length < 3) {
         setPreviousConsultations([]);
         return;
       }
-      const { data } = await supabase
+      
+      let query = supabase
         .from('consultations')
-        .select('*')
-        .ilike('patient_name', `%${formData.patientName}%`)
+        .select('*');
+      
+      if (formData.patientName.length >= 3 && formData.patientPhone.length >= 3) {
+        query = query.or(`patient_name.ilike.%${formData.patientName}%,patient_phone.ilike.%${formData.patientPhone}%`);
+      } else if (formData.patientName.length >= 3) {
+        query = query.ilike('patient_name', `%${formData.patientName}%`);
+      } else {
+        query = query.ilike('patient_phone', `%${formData.patientPhone}%`);
+      }
+
+      const { data } = await query
         .order('created_at', { ascending: false })
-        .limit(3);
+        .limit(10);
       
       if (data && data.length > 0) {
         setPreviousConsultations(data);
@@ -98,7 +108,7 @@ export default function NewConsultation() {
 
     const timeoutId = setTimeout(fetchPrevious, 500);
     return () => clearTimeout(timeoutId);
-  }, [formData.patientName]);
+  }, [formData.patientName, formData.patientPhone]);
 
   const handleSelectPreviousPatient = (patient: any) => {
     setFormData(prev => ({

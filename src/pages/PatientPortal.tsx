@@ -53,15 +53,24 @@ export default function PatientPortal() {
         
         setConsultation(consultationData);
 
-        if (consultationData && consultationData.patient_name) {
-          const { data: historyData } = await supabase
+        if (consultationData && (consultationData.patient_name || consultationData.patient_phone)) {
+          let query = supabase
             .from('consultations')
             .select('*')
-            .eq('patient_name', consultationData.patient_name)
             .eq('status', 'completed')
-            .neq('consultation_id', id)
+            .neq('consultation_id', id);
+
+          if (consultationData.patient_name && consultationData.patient_phone) {
+            query = query.or(`patient_name.eq."${consultationData.patient_name}",patient_phone.eq."${consultationData.patient_phone}"`);
+          } else if (consultationData.patient_name) {
+            query = query.eq('patient_name', consultationData.patient_name);
+          } else {
+            query = query.eq('patient_phone', consultationData.patient_phone);
+          }
+
+          const { data: historyData } = await query
             .order('created_at', { ascending: false })
-            .limit(3);
+            .limit(10);
           
           if (historyData) {
             setPreviousConsultations(historyData);

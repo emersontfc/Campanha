@@ -54,7 +54,7 @@ export default function Dashboard() {
           .eq('professional_id', user.id)
           .eq('status', 'completed')
           .order('created_at', { ascending: false })
-          .limit(5);
+          .limit(50);
         
         setRecentConsultations(recent || []);
         setStats({ total: count || 0, today: 0 });

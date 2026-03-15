@@ -111,14 +111,24 @@ export default function EditConsultation() {
         setAiAnalysis(c.ai_analysis);
 
         // Fetch previous history
-        if (c.patient_name) {
-          const { data: historyData } = await supabase
+        if (c.patient_name || c.patient_phone) {
+          let query = supabase
             .from('consultations')
             .select('*')
-            .eq('patient_name', c.patient_name)
             .neq('consultation_id', id)
+            .eq('status', 'completed');
+
+          if (c.patient_name && c.patient_phone) {
+            query = query.or(`patient_name.eq."${c.patient_name}",patient_phone.eq."${c.patient_phone}"`);
+          } else if (c.patient_name) {
+            query = query.eq('patient_name', c.patient_name);
+          } else {
+            query = query.eq('patient_phone', c.patient_phone);
+          }
+
+          const { data: historyData } = await query
             .order('created_at', { ascending: false })
-            .limit(3);
+            .limit(10);
           
           if (historyData) {
             setPreviousConsultations(historyData);
