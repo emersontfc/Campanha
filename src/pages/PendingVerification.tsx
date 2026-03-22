@@ -10,7 +10,7 @@ export default function PendingVerification() {
         </div>
         <h1 className="text-2xl font-bold text-slate-900 mb-2">Conta em Análise</h1>
         <p className="text-slate-500 mb-8">
-          Obrigado por se juntar à Al-Shifa Health Initiative. A sua conta está a ser verificada pelo administrador. 
+          Obrigado por se juntar à Sidrah Health Initiative. A sua conta está a ser verificada pelo administrador. 
           Receberá acesso total assim que o processo for concluído.
         </p>
         <Link 

@@ -96,7 +96,7 @@ export default function PatientPortal() {
     if (!id) return;
     
     const reportUrl = `${window.location.origin}/patient?id=${id}`;
-    const text = `*Relatório de Saúde Al-Shifa*\n\nOlá! Aqui está o seu relatório de saúde (ID: ${id}).\n\nVeja os detalhes completos aqui:\n${reportUrl}`;
+    const text = `*Relatório de Saúde Sidrah*\n\nOlá! Aqui está o seu relatório de saúde (ID: ${id}).\n\nVeja os detalhes completos aqui:\n${reportUrl}`;
     
     const phone = consultation?.patient_phone?.replace(/\D/g, "") || "";
     const url = `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
@@ -197,7 +197,7 @@ export default function PatientPortal() {
             <div className="w-10 h-10 bg-cyan-600 rounded-xl flex items-center justify-center text-white">
               <Activity className="w-6 h-6" />
             </div>
-            <h1 className="font-bold text-slate-900">Al-Shifa Health</h1>
+            <h1 className="font-bold text-slate-900">Sidrah Health</h1>
           </div>
         </header>
 
@@ -353,7 +353,7 @@ export default function PatientPortal() {
             <div className="w-10 h-10 bg-cyan-600 rounded-xl flex items-center justify-center text-white">
               <Activity className="w-6 h-6" />
             </div>
-            <h1 className="font-bold text-slate-900">Al-Shifa Health</h1>
+            <h1 className="font-bold text-slate-900">Sidrah Health</h1>
           </div>
           <div className="flex gap-2">
             <button onClick={handleShare} className="p-2 bg-slate-100 rounded-lg text-slate-600">
@@ -525,7 +525,7 @@ export default function PatientPortal() {
         {/* Footer */}
         <footer className="text-center py-10 space-y-4 print:pt-20">
           <p className="text-xs text-slate-400">
-            Este relatório foi gerado pela Al-Shifa Health Initiative 2026.<br />
+            Este relatório foi gerado pela Sidrah Health Initiative 2026.<br />
             Consulte sempre um médico para diagnóstico e tratamento.
           </p>
           <div className="flex justify-center gap-4 grayscale opacity-30">

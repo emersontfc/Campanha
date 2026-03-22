@@ -147,7 +147,7 @@ export default function EditConsultation() {
   const handleWhatsAppShare = () => {
     if (!id) return;
     const reportUrl = `${window.location.origin}/patient?id=${id}`;
-    const text = `*Relatório de Saúde Al-Shifa*\n\nOlá! Aqui está o seu relatório de saúde (ID: ${id}).\n\nVeja os detalhes completos aqui:\n${reportUrl}`;
+    const text = `*Relatório de Saúde Sidrah*\n\nOlá! Aqui está o seu relatório de saúde (ID: ${id}).\n\nVeja os detalhes completos aqui:\n${reportUrl}`;
     const phone = formData.patientPhone?.replace(/\D/g, "") || "";
     const url = `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
     window.open(url, "_blank");

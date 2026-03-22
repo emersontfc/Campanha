@@ -104,7 +104,7 @@ export default function ResetPassword() {
             <div className="w-10 h-10 bg-cyan-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-cyan-100">
               <HeartPulse className="w-6 h-6" />
             </div>
-            <span className="text-xl font-black text-slate-900 tracking-tight uppercase">AL-SHIFA</span>
+            <span className="text-xl font-black text-slate-900 tracking-tight uppercase">SIDRAH</span>
           </div>
 
           {success ? (

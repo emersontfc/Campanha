@@ -15,9 +15,9 @@ interface DonationSettings {
 
 const defaultSettings: DonationSettings = {
   mpesa_number: "840000000",
-  mpesa_name: "Al-Shifa Health",
+  mpesa_name: "Sidrah Health",
   emola_number: "860000000",
-  emola_name: "Al-Shifa Health",
+  emola_name: "Sidrah Health",
   donation_title: "Apoie a Nossa Causa",
   donation_description: "A sua doação ajuda-nos a levar cuidados de saúde gratuitos a mais comunidades em Moçambique. Cada contribuição faz a diferença."
 };
@@ -202,7 +202,7 @@ export default function Donate() {
 
         <div className="mt-12 text-center">
           <p className="text-slate-400 text-sm">
-            © {new Date().getFullYear()} Al-Shifa Health Moçambique. Todos os direitos reservados.
+            © {new Date().getFullYear()} Sidrah Health Moçambique. Todos os direitos reservados.
           </p>
         </div>
       </main>

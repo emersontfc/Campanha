@@ -54,7 +54,7 @@ export default function LandingPage() {
             <div className="w-8 h-8 sm:w-10 sm:h-10 bg-cyan-600 rounded-lg sm:rounded-xl flex items-center justify-center text-white shadow-lg shadow-cyan-200">
               <HeartPulse className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
-            <span className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">AL-SHIFA</span>
+            <span className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">SIDRAH</span>
           </div>
           <div className="flex items-center gap-2 sm:gap-4">
             <button 
@@ -97,7 +97,7 @@ export default function LandingPage() {
               Saúde de <span className="text-cyan-600">Qualidade</span> para Todos.
             </h1>
             <p className="text-base sm:text-xl text-slate-500 leading-relaxed max-w-xl mx-auto lg:mx-0 font-medium">
-              O Al-Shifa é uma plataforma inteligente de triagem epidemiológica dedicada a levar cuidados preventivos às comunidades de Moçambique.
+              O Sidrah é uma plataforma inteligente de triagem epidemiológica dedicada a levar cuidados preventivos às comunidades de Moçambique.
             </p>
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 pt-4 justify-center lg:justify-start">
               <button 
@@ -205,7 +205,7 @@ export default function LandingPage() {
                 >
                   <img 
                     src={campaignPhotos[currentPhotoIndex].file_url} 
-                    alt="Campanha Al-Shifa" 
+                    alt="Campanha Sidrah" 
                     className="w-full h-full object-cover"
                     referrerPolicy="no-referrer"
                   />
@@ -369,10 +369,10 @@ export default function LandingPage() {
             <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center text-white">
               <HeartPulse className="w-5 h-5" />
             </div>
-            <span className="font-black text-slate-900 tracking-tight">AL-SHIFA</span>
+            <span className="font-black text-slate-900 tracking-tight">SIDRAH</span>
           </div>
           <p className="text-slate-400 text-xs sm:text-sm font-medium text-center">
-            © 2026 Iniciativa de Saúde Al-Shifa Moçambique.
+            © 2026 Iniciativa de Saúde Sidrah Moçambique.
           </p>
           <div className="flex items-center gap-4 sm:gap-6">
             <button onClick={() => navigate("/donate")} className="text-red-500 hover:text-red-600 transition-colors text-[10px] sm:text-sm font-bold">Doar</button>

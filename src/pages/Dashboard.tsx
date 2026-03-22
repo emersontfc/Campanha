@@ -182,7 +182,7 @@ export default function Dashboard() {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="font-bold text-slate-900">Al-Shifa Health</h1>
+                <h1 className="font-bold text-slate-900">Sidrah Health</h1>
                 {profile?.is_verified && <VerifiedBadge size="sm" />}
               </div>
               <p className="text-xs text-slate-500">Olá, {profile?.name}</p>

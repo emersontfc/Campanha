@@ -260,7 +260,7 @@ export default function AdminDashboard() {
         if (!response.ok) throw new Error(data.error || "Erro ao gerar link no servidor");
 
         const resetLink = data.link;
-        const resetMessage = `Olá! Foi solicitada a redefinição de senha para a sua conta na Al-Shifa Health.\n\nClique no link abaixo para criar uma nova senha segura:\n\n${resetLink}\n\nO link é válido por 1 hora por razões de segurança.`;
+        const resetMessage = `Olá! Foi solicitada a redefinição de senha para a sua conta na Sidrah Health.\n\nClique no link abaixo para criar uma nova senha segura:\n\n${resetLink}\n\nO link é válido por 1 hora por razões de segurança.`;
         
         const formattedPhone = phone.replace(/\D/g, "");
         const finalPhone = formattedPhone.startsWith('8') ? `258${formattedPhone}` : formattedPhone;
@@ -420,7 +420,7 @@ export default function AdminDashboard() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute("download", `consultas_alshifa_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute("download", `consultas_sidrah_${new Date().toISOString().split('T')[0]}.csv`);
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
@@ -675,7 +675,7 @@ export default function AdminDashboard() {
             <div className="w-8 h-8 bg-sky-600 rounded-lg flex items-center justify-center text-white shadow-md">
               <Activity className="w-5 h-5" />
             </div>
-            <span className="font-bold text-slate-900 text-lg tracking-tight">Al-Shifa Admin</span>
+            <span className="font-bold text-slate-900 text-lg tracking-tight">Sidrah Admin</span>
           </div>
           <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden text-slate-400 hover:text-slate-600">
             <X className="w-5 h-5" />
@@ -1574,7 +1574,7 @@ export default function AdminDashboard() {
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
                   <input 
-                    required type="email" placeholder="Ex: joao.silva@alshifa.com"
+                    required type="email" placeholder="Ex: joao.silva@sidrah.com"
                     className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none transition-all"
                     value={newUserForm.email} onChange={(e) => setNewUserForm({...newUserForm, email: e.target.value})}
                   />

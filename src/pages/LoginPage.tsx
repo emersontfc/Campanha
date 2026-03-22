@@ -73,7 +73,7 @@ export default function LoginPage() {
             <div className="w-8 h-8 sm:w-10 sm:h-10 bg-cyan-600 rounded-lg sm:rounded-xl flex items-center justify-center text-white shadow-lg shadow-cyan-100 group-hover:scale-110 transition-transform">
               <HeartPulse className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
-            <span className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">AL-SHIFA</span>
+            <span className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">SIDRAH</span>
           </button>
         </div>
 
@@ -210,7 +210,7 @@ export default function LoginPage() {
                 AS
               </div>
               <div>
-                <p className="text-sm font-black text-slate-900">Al-Shifa Health</p>
+                <p className="text-sm font-black text-slate-900">Sidrah Health</p>
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Iniciativa 2026</p>
               </div>
             </div>

@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 import { supabase } from "./supabase";
 
 async function blobToBase64(blob: Blob): Promise<string> {
@@ -23,74 +23,58 @@ export async function analyzeConsultation(data: {
   cvdRisk?: number;
   physicalExamination?: string;
 }) {
-  const model = "gemini-3-flash-preview";
+  // Modelo Lite para economia de tokens e quota
+  const model = "gemini-3.1-flash-lite-preview";
   
   const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
   if (!apiKey) {
     console.error("API Key is missing");
-    return "Erro: Chave API do Gemini não configurada. Por favor, adicione uma chave nas definições do projeto.";
+    return "Erro: Chave API do Gemini não configurada.";
   }
 
   const ai = new GoogleGenAI({ apiKey });
   
-  const systemInstruction = `Você é um Médico Especialista da Al-Shifa Health em Moçambique.
-Gere um relatório de triagem Racional, Conciso e Direto (máximo 150 palavras).
+  const systemInstruction = `Você é um Médico Especialista da Iniciativa Sidrah em Moçambique.
+Gere um relatório de triagem EXTREMAMENTE CONCISO (máximo 100 palavras).
 
-ESTRUTURA OBRIGATÓRIA:
-1. ✅ PARÂMETROS NORMAIS: Liste apenas os nomes dos indicadores que estão dentro da normalidade.
-2. ⚠️ ALTERAÇÕES DETECTADAS: Explique brevemente o que está fora do padrão e o risco associado.
-3. 💡 RECOMENDAÇÕES: Sugestões não farmacológicas (dieta, exercício, hábitos). Utilize as diretrizes fornecidas nos documentos da Base de Conhecimento se disponíveis.
-4. 🏥 SEGUIMENTO: Recomendação clara de quando e onde procurar apoio médico.
+ESTRUTURA:
+1. ✅ NORMAL: Indicadores normais.
+2. ⚠️ ALERTAS: O que está fora do padrão.
+3. 💡 AÇÕES: Recomendações diretas.
+4. 🏥 SEGUIMENTO: Quando procurar médico.
 
-ESTILO:
-- Use Markdown para estruturar (negrito para destaques).
-- Tom profissional, empático e focado em Moçambique.
-- Evite introduções longas ou saudações excessivas. Vá direto aos pontos.`;
+ESTILO: Markdown, direto, sem introduções.`;
 
-  const prompt = `DADOS DO PACIENTE:
-- IMC: ${data.bmi.toFixed(1)} (Peso: ${data.weight}kg, Altura: ${data.height}cm)
-- TA: ${data.systolic}/${data.diastolic} mmHg
-- Glicemia: ${data.glucose} mmol/L
-- Sexo: ${data.patientSex === 'M' ? 'Masc' : 'Fem'}
-- Fumador: ${data.isSmoker ? 'Sim' : 'Não'}
-- Em tratamento TA: ${data.isTreated ? 'Sim' : 'Não'}
-- Risco CVD (10 anos): ${data.cvdRisk}%
-${data.physicalExamination ? `- Exame Físico: ${data.physicalExamination}` : ''}
-
-REFERÊNCIA DE NORMALIDADE:
-- TA: < 130/85 mmHg
-- Glicemia: 4.0 - 7.0 mmol/L
-- IMC: 18.5 - 24.9
-
-Gere a análise clínica racionalizada baseando-se nos dados acima e nas diretrizes dos documentos anexados (se houver).`;
+  const prompt = `DADOS: IMC ${data.bmi.toFixed(1)}, TA ${data.systolic}/${data.diastolic}, Glicemia ${data.glucose}, Sexo ${data.patientSex}, Fumador ${data.isSmoker ? 'Sim' : 'Não'}, Risco CVD ${data.cvdRisk}%. ${data.physicalExamination ? `Exame: ${data.physicalExamination}` : ''}`;
 
   try {
     const parts: any[] = [{ text: prompt }];
 
-    // Fetch Knowledge Base documents
+    // Fetch Knowledge Base - Limitado a 1 documento para economizar tokens
     const { data: kbDocs } = await supabase
       .from('knowledge_base')
       .select('file_url')
-      .limit(2); // Reduced limit to avoid payload size issues
+      .limit(1); 
 
-    if (kbDocs && kbDocs.length > 0) {
-      for (const doc of kbDocs) {
-        try {
-          const res = await fetch(doc.file_url);
-          if (!res.ok) continue;
+    if (kbDocs?.[0]) {
+      try {
+        const res = await fetch(kbDocs[0].file_url);
+        if (res.ok) {
           const blob = await res.blob();
-          if (blob.size > 4 * 1024 * 1024) continue; // Skip files > 4MB
-          const base64 = await blobToBase64(blob);
-          const base64Data = base64.includes(',') ? base64.split(',')[1] : base64;
-          parts.push({
-            inlineData: {
-              data: base64Data,
-              mimeType: 'application/pdf'
-            }
-          });
-        } catch (e) {
-          console.error("Error loading KB doc:", e);
+          // Limite de 2MB para preservar quota
+          if (blob.size <= 2 * 1024 * 1024) {
+            const base64 = await blobToBase64(blob);
+            const base64Data = base64.includes(',') ? base64.split(',')[1] : base64;
+            parts.push({
+              inlineData: {
+                data: base64Data,
+                mimeType: 'application/pdf'
+              }
+            });
+          }
         }
+      } catch (e) {
+        console.error("Error loading KB doc:", e);
       }
     }
 
@@ -99,33 +83,20 @@ Gere a análise clínica racionalizada baseando-se nos dados acima e nas diretri
       contents: { parts },
       config: {
         systemInstruction,
-        temperature: 0.2, // Lower temperature for more consistent medical advice
-        topP: 0.8,
+        temperature: 0.1,
+        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW }, // Minimiza custo de tokens
       },
     });
 
     const text = response.text;
-    if (!text) {
-      throw new Error("A IA retornou uma resposta vazia.");
-    }
+    if (!text) throw new Error("Resposta vazia.");
 
     return text;
   } catch (error: any) {
     console.error("Error analyzing with Gemini:", error);
-    const errorMessage = error?.message || String(error);
-    
-    if (errorMessage.includes("API key not valid")) {
-      return "Erro: A chave API do Gemini é inválida. Por favor, verifique as definições.";
+    if (error?.message?.includes("quota")) {
+      return "Erro: Limite de utilização atingido. Otimizações de tokens aplicadas para reduzir este erro.";
     }
-    
-    if (errorMessage.includes("permission") || error?.status === "PERMISSION_DENIED") {
-      return "Erro: A sua chave API não tem permissão para usar este modelo. Certifique-se de que a API Generative Language está ativa no seu projeto Google Cloud.";
-    }
-    
-    if (errorMessage.includes("quota")) {
-      return "Erro: Limite de utilização da IA atingido. Por favor, tente novamente mais tarde.";
-    }
-
-    return "Pedimos desculpa, mas não conseguimos gerar a análise automática agora devido a um erro técnico. Por favor, realize a análise manualmente.";
+    return "Erro técnico na análise automática. Por favor, realize a análise manualmente.";
   }
 }
